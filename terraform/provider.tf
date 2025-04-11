@@ -7,7 +7,7 @@ terraform {
   }
 
   backend "s3" {
-    bucket = "iykonect-aws-parallel"
+    bucket = "iykonect-aws-parallel-3793"
     key    = "terraform.tfstate"
     #region = "us-east-1"
   }
