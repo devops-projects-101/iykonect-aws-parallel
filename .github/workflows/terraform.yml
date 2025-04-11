@@ -14,10 +14,6 @@ jobs:
   terraform:
     name: 'Terraform'
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        environment: [dev, prod]
-    environment: ${{ matrix.environment }}
 
     defaults:
       run:
@@ -32,12 +28,16 @@ jobs:
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        #aws-region: ${{ secrets.AWS_REGION }}
 
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v2
       with:
-        terraform_version: '1.5.0'
+        terraform_version: '1.6.6'
+
+    - name: Create S3 bucket for Terraform state
+      run: |
+        aws s3api head-bucket --bucket iykonect-aws-parallel 2>/dev/null || \
+        aws s3api create-bucket --bucket iykonect-aws-parallel --region us-east-1
 
     - name: Terraform Format
       id: fmt
@@ -52,17 +52,9 @@ jobs:
       id: validate
       run: terraform validate
 
-    - name: Create Terraform Variables File
-      run: |
-        cat << EOF > terraform.tfvars.json
-        {
-          "environment": "${{ matrix.environment }}"
-        }
-        EOF
-
     - name: Terraform Plan
       id: plan
-      run: terraform plan -var-file="terraform.tfvars.json" -no-color -input=false
+      run: terraform plan -no-color -input=false
       continue-on-error: true
 
     - name: Update Pull Request
@@ -77,7 +69,6 @@ jobs:
           #### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
           #### Terraform Validation 🤖\`${{ steps.validate.outcome }}\`
           #### Terraform Plan 📖\`${{ steps.plan.outcome }}\`
-          Environment: ${{ matrix.environment }}
           
           <details><summary>Show Plan</summary>
           
@@ -96,4 +87,4 @@ jobs:
 
     - name: Terraform Apply
       if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-      run: terraform apply -var-file="terraform.tfvars.json" -auto-approve -input=false
+      run: terraform apply -auto-approve -input=false
