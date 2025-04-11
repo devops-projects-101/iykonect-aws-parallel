@@ -5,6 +5,13 @@ on:
     branches:
       - main
   pull_request:
+  workflow_dispatch:
+    inputs:
+      destroy:
+        description: 'Destroy infrastructure'
+        type: boolean
+        required: true
+        default: false
 
 permissions:
   contents: read
@@ -88,5 +95,9 @@ jobs:
           })
 
     - name: Terraform Apply
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+      if: github.ref == 'refs/heads/main' && github.event_name == 'push' && !inputs.destroy
       run: terraform apply -auto-approve -input=false
+
+    - name: Terraform Destroy
+      if: inputs.destroy == true && github.event_name == 'workflow_dispatch'
+      run: terraform destroy -auto-approve -input=false
