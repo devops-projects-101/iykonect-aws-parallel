@@ -38,8 +38,8 @@ jobs:
 
     - name: Create S3 bucket for Terraform state
       run: |
-        aws s3api head-bucket --bucket iykonect-aws-parallel 2>/dev/null || \
-        aws s3api create-bucket --bucket iykonect-aws-parallel --region us-east-1
+        aws s3api head-bucket --bucket iykonect-aws-parallel-3793 2>/dev/null || \
+        aws s3api create-bucket --bucket iykonect-aws-parallel-3793 --region us-east-1
 
     - name: Terraform Format
       id: fmt
