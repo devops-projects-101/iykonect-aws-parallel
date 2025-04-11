@@ -14,11 +14,9 @@ PROMETHEUS_IMAGE=prom/prometheus:latest
 GRAFANA_IMAGE=grafana/grafana-oss:11.0.0-ubuntu
 EOL
 
-# Create docker-compose directory
+# Create docker-compose directory and file
 mkdir -p /home/ubuntu/docker
-cat > /home/ubuntu/docker/docker-compose.yml << 'EOL'
-${docker_compose_content}
-EOL
+echo '${docker_compose_content}' > /home/ubuntu/docker/docker-compose.yml
 
 # Set permissions and start services
 cd /home/ubuntu/docker
