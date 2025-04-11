@@ -1,0 +1,48 @@
+version: '3'
+
+services:
+  redis:
+    image: ${REDIS_IMAGE}
+    ports:
+      - "6379:6379"
+    restart: always
+
+  api:
+    image: ${API_IMAGE}
+    ports:
+      - "8080:80"
+    depends_on:
+      - redis
+    restart: always
+
+  sonarqube:
+    image: ${SONARQUBE_IMAGE}
+    ports:
+      - "9000:9000"
+    depends_on:
+      - postgres
+    restart: always
+
+  postgres:
+    image: ${POSTGRES_IMAGE}
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: sonarqube
+      POSTGRES_USER: sonarqube
+      POSTGRES_PASSWORD: sonarqube
+    restart: always
+
+  prometheus:
+    image: ${PROMETHEUS_IMAGE}
+    ports:
+      - "9090:9090"
+    restart: always
+
+  grafana:
+    image: ${GRAFANA_IMAGE}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - prometheus
+    restart: always

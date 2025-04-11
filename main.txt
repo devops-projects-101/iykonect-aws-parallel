@@ -1,0 +1,22 @@
+migration/
+├── terraform/
+│   ├── main.tf
+│   ├── variables.tf
+│   ├── outputs.tf
+│   ├── provider.tf
+│   ├── modules/
+│   │   ├── vpc/
+│   │   │   ├── main.tf
+│   │   │   ├── variables.tf
+│   │   │   └── outputs.tf
+│   │   └── ec2/
+│   │       ├── main.tf
+│   │       ├── variables.tf
+│   │       ├── outputs.tf
+│   │       └── user-data.sh
+│   └── terraform.tfvars
+├── docker/
+│   └── docker-compose.yml
+└── .github/
+    └── workflows/
+        └── terraform.yml
