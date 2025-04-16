@@ -73,8 +73,10 @@ resource "aws_instance" "main" {
   subnet_id     = var.subnet_id
 
   vpc_security_group_ids = [aws_security_group.instance.id]
-  user_data             = templatefile("${path.module}/user-data.sh", {
+  user_data = templatefile("${path.module}/user-data.sh", {
     docker_compose_content = var.docker_compose_content
+    docker_username       = var.docker_username
+    docker_password       = var.docker_password
   })
 
   tags = {
