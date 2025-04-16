@@ -35,7 +35,7 @@ jobs:
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: us-east-1
+        aws-region: eu-west-1
         audience: sts.amazonaws.com
 
     - name: Setup Terraform
@@ -96,6 +96,9 @@ jobs:
 
     - name: Terraform Apply
       if: github.ref == 'refs/heads/main' && github.event_name == 'push' && !inputs.destroy
+      env:
+        TF_VAR_docker_username: ${{ secrets.DOCKER_USERNAME }}
+        TF_VAR_docker_password: ${{ secrets.DOCKER_PASSWORD }}
       run: terraform apply -auto-approve -input=false
 
     - name: Terraform Destroy

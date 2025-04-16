@@ -4,6 +4,9 @@ sudo apt-get install -y docker.io docker-compose
 sudo systemctl start docker
 sudo systemctl enable docker
 
+# Docker Hub login
+echo "${docker_password}" | sudo docker login -u ${docker_username} --password-stdin
+
 # Create environment file with Docker image versions
 cat > /home/ubuntu/.env << EOL
 REDIS_IMAGE=redis:latest
