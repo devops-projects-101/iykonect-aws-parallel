@@ -14,11 +14,12 @@ terraform {
 }
 
 provider "aws" {
-  #region = "eu-west-1"
   default_tags {
     tags = {
-      ManagedBy = "terraform"
-      Project   = "parallel"
+      ManagedBy   = "terraform"
+      Project     = "parallel"
+      Name        = "iykonect-migrate"
+      LastUpdated = formatdate("YYYY-MM-DD-hh-mm", timestamp())
     }
   }
 }
