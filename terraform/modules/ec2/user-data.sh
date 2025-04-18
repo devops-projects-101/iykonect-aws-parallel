@@ -13,37 +13,30 @@ log() {
     echo "[$(date)] $1" | sudo tee -a /var/log/user-data.log
 }
 
-
-
-# # Configure AWS credentials directly
-export AWS_ACCESS_KEY_ID='${AWS_ACCESS_KEY_ID}'
-export AWS_SECRET_ACCESS_KEY='${AWS_SECRET_ACCESS_KEY}'
-export AWS_REGION='${AWS_REGION}'
-export AWS_DEFAULT_REGION='${AWS_REGION}'
-
-
 # Initial setup
 apt-get update
 apt-get install -y awscli jq
 log "Installed basic packages"
 
- AWS_REGION="us-east-1"
+# Set AWS credentials and region
+export AWS_ACCESS_KEY_ID='${AWS_ACCESS_KEY_ID}'
+export AWS_SECRET_ACCESS_KEY='${AWS_SECRET_ACCESS_KEY}'
+export AWS_REGION='${AWS_REGION}'
+export AWS_DEFAULT_REGION='${AWS_REGION}'
 
-
-# # Configure AWS CLI
-mkdir -p ~/.aws
-cat > ~/.aws/credentials << EOF
+# Configure AWS CLI
+mkdir -p /root/.aws
+cat > /root/.aws/credentials << EOF
 [default]
-aws_access_key_id = ${AWS_ACCESS_KEY_ID}
-aws_secret_access_key = ${AWS_SECRET_ACCESS_KEY}
+aws_access_key_id=${AWS_ACCESS_KEY_ID}
+aws_secret_access_key=${AWS_SECRET_ACCESS_KEY}
 EOF
 
-cat > ~/.aws/config << EOF
+cat > /root/.aws/config << EOF
 [default]
-region = ${AWS_REGION}
-output = json
+region=${AWS_REGION}
+output=json
 EOF
-
 
 log "AWS credentials configured with region: ${AWS_REGION}"
 
@@ -54,8 +47,6 @@ if ! aws sts get-caller-identity > /dev/null 2>&1; then
     exit 1
 fi
 log "AWS credentials verified successfully"
-
-
 
 # Install Docker
 apt-get remove docker docker-engine docker.io containerd runc || true
