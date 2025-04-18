@@ -1,22 +1,43 @@
 #!/bin/bash
 
 # Enable logging of both stdout and stderr
-exec 1> >(tee /var/log/user-data.log) 2>&1
+exec 1> /var/log/user-data.log 2>&1
 
-echo "[$(date)] START - user data execution"
+# Logging function
+log() {
+    echo "[$(date)] $1"
+}
+
+log "START - user data execution"
+
+# Clean up disk space
+log "Cleaning up disk space"
+sudo apt-get clean
+sudo apt-get autoremove -y
+sudo rm -rf /var/lib/apt/lists/*
+sudo rm -rf /usr/share/doc/*
+sudo rm -rf /usr/share/man/*
+sudo rm -rf /var/cache/apt/*
+sudo rm -rf /var/tmp/*
+sudo rm -rf /tmp/*
+log "Disk cleanup completed"
+
+# Show disk space
+df -h
+log "Current disk space usage shown above"
 
 sudo apt-get update
 sudo apt-get install -y docker.io awscli
 sudo systemctl start docker
 sudo systemctl enable docker
-echo "[$(date)] Installed required packages"
+log "Installed required packages"
 
 # Configure AWS CLI
 aws_region="eu-west-1"
 aws configure set aws_access_key_id "${aws_access_key}"
 aws configure set aws_secret_access_key "${aws_secret_key}"
 aws configure set region "eu-west-1"
-echo "[$(date)] Configured AWS CLI"
+log "Configured AWS CLI"
 
 # Configure AWS CLI and authenticate with ECR
 aws ecr get-login-password --region eu-west-1 | sudo docker login --username AWS --password-stdin 571664317480.dkr.ecr.eu-west-1.amazonaws.com
@@ -25,15 +46,15 @@ aws ecr get-login-password --region eu-west-1 | sudo docker login --username AWS
 sudo docker network create app-network
 
 # Pull images from ECR with detailed error handling
-echo "[$(date)] Starting to pull images from ECR"
+log "Starting to pull images from ECR"
 for image in redis prometheus grafana api react-app; do
-    echo "[$(date)] Pulling image: $image"
+    log "Pulling image: $image"
     if output=$(sudo docker pull 571664317480.dkr.ecr.eu-west-1.amazonaws.com/iykonect-images:$image 2>&1); then
-        echo "[$(date)] Successfully pulled $image"
-        echo "Output: $output"
+        log "Successfully pulled $image"
+        log "Output: $output"
     else
-        echo "[$(date)] ERROR: Failed to pull $image"
-        echo "Error details: $output"
+        log "ERROR: Failed to pull $image"
+        log "Error details: $output"
         exit 1
     fi
 done
@@ -45,16 +66,16 @@ check_container() {
     local attempt=1
     
     while [ $attempt -le $max_attempts ]; do
-        echo "[$(date)] Checking $container_name status (Attempt $attempt/$max_attempts)"
+        log "Checking $container_name status (Attempt $attempt/$max_attempts)"
         if status=$(sudo docker inspect --format '{{.State.Status}}' "$container_name" 2>&1); then
             if [ "$status" = "running" ]; then
-                echo "[$(date)] Container $container_name is running successfully"
+                log "Container $container_name is running successfully"
                 return 0
             else
-                echo "[$(date)] Container $container_name status: $status"
+                log "Container $container_name status: $status"
             fi
         else
-            echo "[$(date)] Error checking container status: $status"
+            log "Error checking container status: $status"
         fi
         attempt=$((attempt + 1))
         sleep 5
@@ -64,7 +85,7 @@ check_container() {
 
 # Pull images and run containers
 for service in redis prometheus grafana api react-app; do
-    echo "[$(date)] Starting $service container"
+    log "Starting $service container"
     
     case $service in
         "redis")
@@ -87,35 +108,35 @@ for service in redis prometheus grafana api react-app; do
 
     if [ ! -z "$cmd" ]; then
         if output=$(eval "$cmd" 2>&1); then
-            echo "[$(date)] $service container started successfully"
-            echo "Container ID: $output"
+            log "$service container started successfully"
+            log "Container ID: $output"
             
             # Verify container is running properly
             if ! check_container "$container_name"; then
-                echo "[$(date)] ERROR: Container $container_name failed health check"
+                log "ERROR: Container $container_name failed health check"
                 exit 1
             fi
         else
-            echo "[$(date)] ERROR: Failed to start $service container"
-            echo "Error details: $output"
+            log "ERROR: Failed to start $service container"
+            log "Error details: $output"
             exit 1
         fi
     fi
 done
 
 # Run Grafana Renderer (non-ECR image)
-echo "[$(date)] Starting Grafana Renderer container"
+log "Starting Grafana Renderer container"
 if output=$(sudo docker run -d \
     --name renderer \
     --network app-network \
     -p 8081:8081 \
     --restart always \
     grafana/grafana-image-renderer:latest 2>&1); then
-    echo "[$(date)] Grafana Renderer container started successfully"
-    echo "Container ID: $output"
+    log "Grafana Renderer container started successfully"
+    log "Container ID: $output"
 else
-    echo "[$(date)] ERROR: Failed to start Grafana Renderer container"
-    echo "Error details: $output"
+    log "ERROR: Failed to start Grafana Renderer container"
+    log "Error details: $output"
     exit 1
 fi
 
@@ -123,4 +144,4 @@ fi
 sudo mkdir -p /home/ubuntu/logs /home/ubuntu/grafana/{provisioning/datasources,provisioning/dashboards,dashboards}
 sudo chown -R ubuntu:ubuntu /home/ubuntu/logs /home/ubuntu/grafana
 
-echo "[$(date)] END - user data execution"
+log "END - user data execution"
