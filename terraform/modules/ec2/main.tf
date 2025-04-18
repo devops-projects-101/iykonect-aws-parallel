@@ -77,6 +77,9 @@ resource "aws_instance" "main" {
     docker_compose_content = var.docker_compose_content
     docker_username       = var.docker_username
     docker_password       = var.docker_password
+    aws_access_key       = var.aws_access_key
+    aws_secret_key       = var.aws_secret_key
+    aws_region           = var.aws_region
   })
 
   tags = {
