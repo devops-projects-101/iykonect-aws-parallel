@@ -1,5 +1,8 @@
 #!/bin/bash
 
+set -x
+set -e
+
 # Logging function
 log() {
     echo "[$(date)] $1" >> /var/log/user-data.log
@@ -7,31 +10,15 @@ log() {
 
 # Initial setup
 sudo apt-get update
-sudo apt-get install -y docker.io awscli nfs-common jq
-sudo systemctl start docker
-sudo systemctl enable docker
-log "Installed required packages"
+sudo apt-get install -y nfs-common awscli jq
+log "Installed basic packages"
 
-log "START - user data execution"
-
-
-# Fetch credentials from S3
-log "Fetching credentials from S3"
-aws s3 cp s3://iykonect-aws-parallel/credentials.sh /root/credentials.sh
-chmod 600 /root/credentials.sh
-
-# Load credentials
-source /root/credentials.sh
-log "Credentials loaded successfully"
-
-
-
-# Setup mount point for EFS
+# Setup mount point for EFS first
 mount_point="/iykonect-data"
 sudo mkdir -p $mount_point
 log "Created mount point at $mount_point"
 
-# Mount EFS
+# Mount EFS before Docker installation
 log "Mounting EFS filesystem at ${EFS_DNS_NAME}"
 if ! sudo mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport "${EFS_DNS_NAME}:/" $mount_point; then
     log "ERROR: Failed to mount EFS"
@@ -39,6 +26,88 @@ if ! sudo mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=60
 fi
 log "EFS mounted successfully"
 
+# Prepare Docker directories on EFS
+sudo mkdir -p $mount_point/docker
+sudo mkdir -p $mount_point/data
+sudo mkdir -p $mount_point/logs
+sudo chown -R root:root $mount_point/docker
+sudo chmod -R 755 $mount_point/docker
+
+# Now install Docker
+sudo apt-get remove docker docker-engine docker.io containerd runc || true
+sudo apt-get update
+sudo apt-get install -y \
+    apt-transport-https \
+    ca-certificates \
+    curl \
+    gnupg \
+    lsb-release
+
+# Add Docker's official GPG key
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /usr/share/keyrings/docker-archive-keyring.gpg
+
+# Add Docker repository
+echo \
+  "deb [arch=amd64 signed-by=/usr/share/keyrings/docker-archive-keyring.gpg] https://download.docker.com/linux/ubuntu \
+  $(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+
+# Setup kernel modules and sysctl settings
+cat << EOF | sudo tee /etc/modules-load.d/docker.conf
+overlay
+br_netfilter
+EOF
+
+sudo modprobe overlay
+sudo modprobe br_netfilter
+
+cat << EOF | sudo tee /etc/sysctl.d/docker.conf
+net.bridge.bridge-nf-call-iptables = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.ipv4.ip_forward = 1
+EOF
+
+sudo sysctl --system
+
+# Setup Docker daemon with EFS storage
+sudo mkdir -p /etc/docker
+cat << EOF | sudo tee /etc/docker/daemon.json
+{
+    "data-root": "$mount_point/docker",
+    "storage-driver": "overlay2",
+    "exec-opts": ["native.cgroupdriver=systemd"],
+    "log-driver": "json-file",
+    "log-opts": {
+        "max-size": "100m"
+    },
+    "storage-opts": [
+        "overlay2.override_kernel_check=true"
+    ]
+}
+EOF
+
+# Install Docker and verify
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io
+sudo systemctl enable docker
+sudo systemctl start docker
+
+# Verify Docker is using EFS
+if ! sudo docker info | grep "Docker Root Dir: $mount_point/docker"; then
+    log "ERROR: Docker not using EFS storage"
+    exit 1
+fi
+log "Docker configured with EFS storage successfully"
+
+log "START - user data execution"
+
+# Fetch credentials from S3
+log "Fetching credentials from S3"
+aws s3 cp s3://iykonect-aws-parallel/credentials.sh /root/credentials.sh
+chmod 600 /root/credentials.sh
+
+# Load credentials
+sh /root/credentials.sh
+log "Credentials loaded successfully"
 
 # Configure AWS CLI
 log "Configuring AWS CLI"
@@ -54,22 +123,27 @@ if ! aws sts get-caller-identity > /dev/null 2>&1; then
 fi
 log "AWS CLI configured successfully"
 
-# Setup Docker 
-log "Configuring Docker with EFS storage"
-sudo mkdir -p /etc/docker
-cat << EOF | sudo tee /etc/docker/daemon.json
-{
-    "data-root": "$mount_point/docker",
-    "storage-driver": "overlay2"
-}
-EOF
-
-sudo mkdir -p $mount_point/{docker,data,logs}
-sudo chown -R root:root $mount_point/docker
+# Restart Docker with new configuration
+sudo systemctl daemon-reload
 sudo systemctl restart docker
+
+# Verify Docker is running
+if ! sudo docker info > /dev/null 2>&1; then
+    log "ERROR: Docker failed to start"
+    exit 1
+fi
+log "Docker configured successfully"
 
 # Create docker network
 sudo docker network create app-network
+
+# Login to ECR
+log "Authenticating with ECR"
+if ! aws ecr get-login-password --region ${AWS_REGION} | sudo docker login --username AWS --password-stdin 571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com; then
+    log "ERROR: Failed to authenticate with ECR"
+    exit 1
+fi
+log "Successfully authenticated with ECR"
 
 # Pull and run containers
 log "Starting to pull and run containers"
