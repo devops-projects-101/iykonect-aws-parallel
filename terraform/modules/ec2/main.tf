@@ -86,3 +86,19 @@ resource "aws_instance" "main" {
     Name = "${var.prefix}-instance"
   }
 }
+
+resource "aws_ebs_volume" "docker_volume" {
+  availability_zone = aws_instance.main.availability_zone
+  size             = 30
+  type             = "gp3"
+
+  tags = {
+    Name = "${var.prefix}-docker-volume"
+  }
+}
+
+resource "aws_volume_attachment" "docker_volume_att" {
+  device_name = "/dev/xvdf"
+  volume_id   = aws_ebs_volume.docker_volume.id
+  instance_id = aws_instance.main.id
+}

@@ -28,10 +28,31 @@ df -h
 log "Current disk space usage shown above"
 
 sudo apt-get update
-sudo apt-get install -y docker.io awscli
+sudo apt-get install -y docker.io awscli xfsprogs
 sudo systemctl start docker
 sudo systemctl enable docker
 log "Installed required packages"
+
+# Format and mount the EBS volume
+log "Preparing EBS volume for Docker data"
+sudo mkfs.xfs /dev/xvdf
+sudo mkdir -p /docker-data
+sudo mount /dev/xvdf /docker-data
+
+# Add mount to fstab
+echo "/dev/xvdf /docker-data xfs defaults 0 0" | sudo tee -a /etc/fstab
+
+# Configure Docker to use the new volume
+sudo mkdir -p /etc/docker
+cat << EOF | sudo tee /etc/docker/daemon.json
+{
+    "data-root": "/docker-data"
+}
+EOF
+
+# Restart Docker to apply new configuration
+sudo systemctl restart docker
+log "Docker configured to use EBS volume"
 
 # Configure AWS CLI
 log "Configuring AWS CLI"
@@ -69,36 +90,74 @@ sudo docker network create app-network
 # Function to check disk space
 check_disk_space() {
     USAGE=$(df / | awk 'NR==2 {print $5}' | sed 's/%//')
-    if [ "$USAGE" -gt 80 ]; then
-        log "WARNING: Disk usage is at $USAGE%. Cleaning up..."
-        # Clean Docker
+    log "Current disk usage: $USAGE%"
+    
+    if [ "$USAGE" -gt 70 ]; then
+        log "WARNING: Disk usage is high at $USAGE%. Performing cleanup..."
+        
+        # Stop and remove all containers
+        sudo docker stop $(sudo docker ps -aq) 2>/dev/null
+        sudo docker rm $(sudo docker ps -aq) 2>/dev/null
+        
+        # Remove all images
+        sudo docker rmi $(sudo docker images -q) 2>/dev/null
+        
+        # Clean Docker system
         sudo docker system prune -af
         sudo docker volume prune -f
         sudo docker builder prune -af
         
-        # Clear package manager cache
+        # Clear package manager and system caches
         sudo apt-get clean
         sudo apt-get autoremove -y
+        sudo rm -rf /var/lib/apt/lists/*
+        sudo rm -rf /var/cache/*
+        sudo rm -rf /tmp/*
+        sudo rm -rf /var/tmp/*
         
-        # Show new disk usage
-        df -h
+        # Clear npm and yarn caches
+        sudo rm -rf /usr/local/share/.cache/yarn
+        sudo rm -rf /root/.npm
+        sudo rm -rf /home/ubuntu/.npm
+        
+        NEW_USAGE=$(df / | awk 'NR==2 {print $5}' | sed 's/%//')
+        log "Disk usage after cleanup: $NEW_USAGE%"
+        
+        if [ "$NEW_USAGE" -gt 80 ]; then
+            log "ERROR: Unable to free sufficient disk space"
+            return 1
+        fi
     fi
+    return 0
 }
 
 # Pull images from ECR with detailed error handling and disk space checks
 log "Starting to pull images from ECR"
 for image in redis prometheus grafana api react-app; do
-    check_disk_space
-    log "Pulling image: $image"
-    if output=$(sudo docker pull 571664317480.dkr.ecr.eu-west-1.amazonaws.com/iykonect-images:$image 2>&1); then
-        log "Successfully pulled $image"
-        log "Output: $output"
-    else
-        log "ERROR: Failed to pull $image"
-        log "Error details: $output"
-        check_disk_space
+    if ! check_disk_space; then
+        log "ERROR: Insufficient disk space to pull images"
         exit 1
     fi
+    
+    log "Pulling image: $image"
+    PULL_CMD="sudo docker pull 571664317480.dkr.ecr.eu-west-1.amazonaws.com/iykonect-images:$image"
+    
+    while IFS= read -r line; do
+        log "$line"
+        if [[ $line == *"no space left on device"* ]]; then
+            if ! check_disk_space; then
+                log "ERROR: Failed to free up space during pull"
+                exit 1
+            fi
+        fi
+    done < <($PULL_CMD 2>&1 || echo "PULL_FAILED: $?")
+    
+    if ! sudo docker image inspect 571664317480.dkr.ecr.eu-west-1.amazonaws.com/iykonect-images:$image >/dev/null 2>&1; then
+        log "ERROR: Failed to pull $image"
+        exit 1
+    fi
+    
+    log "Successfully pulled $image"
 done
 
 # Function to check container status
