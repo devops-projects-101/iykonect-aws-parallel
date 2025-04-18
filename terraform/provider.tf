@@ -14,12 +14,5 @@ terraform {
 }
 
 provider "aws" {
-  default_tags {
-    tags = {
-      ManagedBy   = "terraform"
-      Project     = "parallel"
-      Name        = "iykonect-migrate"
-      LastUpdated = formatdate("YYYY-MM-DD-hh-mm", timestamp())
-    }
-  }
+  #region = "eu-west-1"
 }

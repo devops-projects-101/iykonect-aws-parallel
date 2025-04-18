@@ -179,7 +179,10 @@ resource "aws_instance" "main" {
   iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
 
   tags = {
-    Name = "${var.prefix}-instance"
+    Name        = "${var.prefix}-instance"
+    ManagedBy   = "terraform"
+    Project     = "parallel"
+    LastUpdated = formatdate("YYYY-MM-DD-hh-mm", timestamp())
   }
 
   lifecycle {
