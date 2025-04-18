@@ -2,7 +2,7 @@
 
 # Logging function
 log() {
-    echo "[$(date)] $1"
+    echo "[$(date)] $1" >> /var/log/user-data.log
 }
 
 log "START - user data execution"
@@ -43,6 +43,26 @@ sudo chown -R root:root $mount_point/docker
 sudo systemctl restart docker
 
 # Configure AWS CLI
+log "Configuring AWS credentials"
+
+# Validate AWS credentials are provided
+if [ -z "${aws_access_key}" ] || [ -z "${aws_secret_key}" ]; then
+    log "ERROR: AWS credentials not provided"
+    exit 1
+fi
+
+if [ -z "${aws_region}" ]; then
+    aws_region="eu-west-1"
+    log "WARNING: AWS region not set, using default: ${aws_region}"
+fi
+
+# Set AWS environment variables
+export AWS_DEFAULT_REGION=${aws_region}
+export AWS_REGION=${aws_region}
+export AWS_ACCESS_KEY_ID=${aws_access_key}
+export AWS_SECRET_ACCESS_KEY=${aws_secret_key}
+
+# Configure AWS CLI
 mkdir -p /root/.aws
 cat > /root/.aws/credentials << EOF
 [default]
@@ -57,6 +77,14 @@ output = json
 EOF
 
 chmod 600 /root/.aws/{credentials,config}
+
+# Verify AWS configuration
+log "Verifying AWS credentials"
+if ! aws sts get-caller-identity > /dev/null 2>&1; then
+    log "ERROR: AWS credentials validation failed"
+    exit 1
+fi
+log "AWS credentials validated successfully"
 
 # Login to ECR
 aws ecr get-login-password --region ${aws_region} | sudo docker login --username AWS --password-stdin 571664317480.dkr.ecr.${aws_region}.amazonaws.com
