@@ -171,10 +171,14 @@ resource "aws_iam_instance_profile" "ec2_profile" {
   role = aws_iam_role.ec2_role.name
 }
 
-resource "aws_instance" "main" {
-  ami           = data.aws_ami.ubuntu.id
-  instance_type = var.instance_type
-  subnet_id     = var.subnet_id
+resource "aws_spot_instance_request" "main" {
+  ami                            = data.aws_ami.ubuntu.id
+  instance_type                  = var.instance_type
+  subnet_id                      = var.subnet_id
+  spot_price                     = "0.03"
+  wait_for_fulfillment           = true
+  spot_type                      = "one-time"
+  instance_interruption_behavior = "terminate"
 
   root_block_device {
     volume_size           = 50
@@ -194,14 +198,6 @@ resource "aws_instance" "main" {
     AWS_REGION            = var.aws_region
   })
 
-  instance_market_options {
-    market_type = "spot"
-    spot_options {
-      max_price = "0.03"
-      instance_interruption_behavior = "terminate"
-    }
-  }
-
   iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
 
   tags = {
@@ -217,14 +213,14 @@ resource "aws_instance" "main" {
 }
 
 locals {
-  instance_id = aws_instance.main.id
-  public_ip   = aws_instance.main.public_ip
+  instance_id = aws_spot_instance_request.main.spot_instance_id
+  public_ip   = aws_spot_instance_request.main.public_ip
 }
 
 resource "aws_ec2_tag" "spot_instance_tags" {
-  resource_id = aws_instance.main.id
+  resource_id = aws_spot_instance_request.main.spot_instance_id
   key         = "Name"
   value       = "${var.prefix}-spot-instance"
 
-  depends_on = [aws_instance.main]
+  depends_on = [aws_spot_instance_request.main]
 }
