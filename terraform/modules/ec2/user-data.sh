@@ -14,6 +14,20 @@ export AWS_SECRET_ACCESS_KEY='${AWS_SECRET_ACCESS_KEY}'
 export AWS_REGION='${AWS_REGION}'
 export AWS_DEFAULT_REGION='${AWS_REGION}'
 
+# Configure AWS CLI
+mkdir -p ~/.aws
+cat > ~/.aws/credentials << EOF
+[default]
+aws_access_key_id = ${AWS_ACCESS_KEY_ID}
+aws_secret_access_key = ${AWS_SECRET_ACCESS_KEY}
+EOF
+
+cat > ~/.aws/config << EOF
+[default]
+region = ${AWS_REGION}
+output = json
+EOF
+
 # Logging function with proper permissions
 log() {
     echo "[$(date)] $1" | sudo tee -a /var/log/user-data.log
@@ -21,55 +35,18 @@ log() {
 
 log "AWS credentials configured with region: ${AWS_REGION}"
 
+# Verify AWS Configuration
+log "Verifying AWS configuration..."
+if ! aws sts get-caller-identity > /dev/null 2>&1; then
+    log "ERROR: AWS credentials validation failed"
+    exit 1
+fi
+log "AWS credentials verified successfully"
+
 # Initial setup
 apt-get update
 apt-get install -y awscli jq
 log "Installed basic packages"
-
-# Get and load credentials with proper permissions
-log "Reading credentials from S3"
-mkdir -p /root/.aws
-
-# Add retry mechanism for S3 download
-max_attempts=5
-attempt=1
-while [ $attempt -le $max_attempts ]; do
-    log "Attempt $attempt to download credentials file..."
-    
-    # Verify S3 bucket exists
-    if ! aws s3 ls s3://iykonect-aws-parallel/; then
-        log "ERROR: Cannot access S3 bucket, attempt $attempt"
-        sleep 10
-        attempt=$((attempt + 1))
-        continue
-    fi
-    
-    # Try to download file
-    if aws s3 cp s3://iykonect-aws-parallel/credentials.sh /root/credentials.sh; then
-        log "Successfully downloaded credentials file"
-        break
-    fi
-    
-    log "Failed to download credentials file, attempt $attempt"
-    [ $attempt -lt $max_attempts ] && sleep 10
-    attempt=$((attempt + 1))
-done
-
-if [ $attempt -gt $max_attempts ]; then
-    log "ERROR: Failed to download credentials after $max_attempts attempts"
-    exit 1
-fi
-
-chmod 600 /root/credentials.sh
-cat /root/credentials.sh >> /var/log/user-data.log
-. /root/credentials.sh
-
-# Verify credentials loaded
-if [ -z "$AWS_REGION" ]; then
-    log "ERROR: AWS_REGION not set, credentials may not have loaded properly"
-    exit 1
-fi
-log "Using AWS region: ${AWS_REGION}"
 
 # Install Docker
 apt-get remove docker docker-engine docker.io containerd runc || true

@@ -105,12 +105,22 @@ resource "aws_iam_role_policy" "s3_access" {
           "s3:GetObject",
           "s3:GetBucketLocation",
           "s3:ListBucketMultipartUploads",
-          "s3:ListBucketVersions"
+          "s3:ListBucketVersions",
+          "s3:GetObjectVersion",
+          "s3:HeadBucket"
         ]
         Resource = [
           "arn:aws:s3:::iykonect-aws-parallel",
           "arn:aws:s3:::iykonect-aws-parallel/*"
         ]
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:ListAllMyBuckets",
+          "s3:HeadBucket"
+        ]
+        Resource = "*"
       }
     ]
   })
