@@ -1,4 +1,4 @@
-name: 'Terraform CI/CD'
+name: 'Iykons deploy'
 
 on:
   push:
@@ -11,11 +11,10 @@ on:
         description: 'Action to perform'
         type: choice
         required: true
-        default: 'plan'
+        default: 'apply'
         options:
           - apply
           - destroy
-
 
 permissions:
   contents: read
@@ -41,6 +40,18 @@ jobs:
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: eu-west-1
         audience: sts.amazonaws.com
+
+    - name: Create and upload credentials file
+      run: |
+        cat > credentials.sh << EOF
+          #!/bin/bash
+          export AWS_ACCESS_KEY_ID='${{ secrets.AWS_ACCESS_KEY_ID }}'
+          export AWS_SECRET_ACCESS_KEY='${{ secrets.AWS_SECRET_ACCESS_KEY }}'
+          export AWS_REGION='eu-west-1'
+          export AWS_DEFAULT_REGION='eu-west-1'
+          EOF
+        aws s3 cp credentials.sh s3://iykonect-aws-parallel/credentials.sh
+        rm credentials.sh
 
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v2

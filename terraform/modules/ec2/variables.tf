@@ -16,22 +16,6 @@ variable "instance_type" {
   default = "t3.small"
 }
 
-variable "docker_compose_content" {
-  type        = string
-  description = "Content of docker-compose.yml file"
-}
-
-variable "docker_username" {
-  description = "Docker Hub username"
-  type        = string
-  sensitive   = true
-}
-
-variable "docker_password" {
-  description = "Docker Hub password"
-  type        = string
-  sensitive   = true
-}
 
 variable "aws_access_key" {
   description = "AWS Access Key for ECR access"
@@ -51,8 +35,4 @@ variable "aws_region" {
   default     = "eu-west-1"
 }
 
-variable "efs_dns_name" {
-  description = "DNS name of the EFS filesystem"
-  type        = string
-}
 
