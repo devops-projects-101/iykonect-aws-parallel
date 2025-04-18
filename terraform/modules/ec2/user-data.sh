@@ -44,19 +44,16 @@ setup_efs() {
     log "Creating mount point at $mount_point"
     sudo mkdir -p $mount_point
 
-    # Get EFS DNS name from filesystem ID
-    EFS_DNS="${var.prefix}-efs.${var.aws_region}.amazonaws.com"
-
     # Mount EFS filesystem
-    log "Mounting EFS filesystem at $EFS_DNS..."
-    if ! sudo mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport ${EFS_DNS}:/ $mount_point; then
+    log "Mounting EFS filesystem..."
+    if ! sudo mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport "${efs_dns_name}:/" $mount_point; then
         log "ERROR: Failed to mount EFS"
         return 1
     fi
 
     # Add to fstab
     if ! grep -q "$mount_point" /etc/fstab; then
-        echo "${EFS_DNS}:/ $mount_point nfs4 nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,_netdev 0 0" | sudo tee -a /etc/fstab
+        echo "${efs_dns_name}:/ $mount_point nfs4 nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,_netdev 0 0" | sudo tee -a /etc/fstab
         log "Added fstab entry"
     fi
 
