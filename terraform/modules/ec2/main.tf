@@ -213,11 +213,3 @@ resource "aws_ec2_tag" "spot_instance_tags" {
 
   depends_on = [aws_spot_instance_request.main]
 }
-
-output "instance_id" {
-  value = aws_spot_instance_request.main.spot_instance_id
-}
-
-output "public_ip" {
-  value = aws_spot_instance_request.main.public_ip
-}
