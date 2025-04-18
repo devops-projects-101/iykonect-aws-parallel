@@ -3,11 +3,19 @@ resource "aws_efs_file_system" "main" {
   encrypted      = true
 
   lifecycle {
-    prevent_destroy = true
+    prevent_destroy = false
   }
 
   tags = {
     Name = "${var.prefix}-efs"
+  }
+}
+
+resource "aws_efs_backup_policy" "policy" {
+  file_system_id = aws_efs_file_system.main.id
+
+  backup_policy {
+    status = "ENABLED"
   }
 }
 

@@ -24,3 +24,18 @@ module "efs" {
   subnet_id               = module.vpc.public_subnet_id
   allowed_security_groups = [module.ec2.security_group_id]
 }
+
+resource "null_resource" "efs_cleanup" {
+  triggers = {
+    efs_id = module.efs.id
+  }
+
+  provisioner "local-exec" {
+    when    = destroy
+    command = <<-EOT
+      aws efs describe-mount-targets --file-system-id ${self.triggers.efs_id} --query 'MountTargets[*].MountTargetId' --output text | xargs -I {} aws efs delete-mount-target --mount-target-id {}
+      echo "Waiting for mount targets to be deleted..."
+      sleep 30
+    EOT
+  }
+}
