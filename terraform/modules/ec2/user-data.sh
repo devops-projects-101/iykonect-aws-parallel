@@ -37,14 +37,6 @@ for image in redis prometheus grafana api react-app; do
     fi
 done
 
-# Define container configurations
-declare -A containers=(
-    ["redis"]="--name redis_service -p 6379:6379 -e REDIS_PASSWORD=IYKONECTpassword"
-    ["api"]="--name api -p 8000:80"
-    ["prometheus"]="--name prometheus -p 9090:9090"
-    ["grafana"]="--name iykon-graphana-app -p 3100:3000 --user root"
-)
-
 # Function to check container status
 check_container() {
     local container_name=$1
@@ -69,33 +61,44 @@ check_container() {
     return 1
 }
 
-# Run containers in a loop
-echo "[$(date)] Starting containers"
-for container in "${!containers[@]}"; do
-    echo "[$(date)] Starting $container container"
-    if [ "$container" = "redis" ]; then
-        cmd="sudo docker run -d --network app-network --restart always ${containers[$container]} 571664317480.dkr.ecr.${aws_region}.amazonaws.com/iykonect-images:$container redis-server --requirepass IYKONECTpassword --bind 0.0.0.0"
-    else
-        cmd="sudo docker run -d --network app-network --restart always ${containers[$container]} 571664317480.dkr.ecr.${aws_region}.amazonaws.com/iykonect-images:$container"
-    fi
-
-    if output=$(eval "$cmd" 2>&1); then
-        echo "[$(date)] $container container started successfully"
-        echo "Container ID: $output"
-        
-        # Verify container is running properly
-        container_name="${container}"
-        if [ "$container" = "grafana" ]; then
+# Pull images and run containers
+for service in redis prometheus grafana api react-app; do
+    echo "[$(date)] Starting $service container"
+    
+    case $service in
+        "redis")
+            cmd="sudo docker run -d --network app-network --restart always --name redis_service -p 6379:6379 -e REDIS_PASSWORD=IYKONECTpassword 571664317480.dkr.ecr.${aws_region}.amazonaws.com/iykonect-images:redis redis-server --requirepass IYKONECTpassword --bind 0.0.0.0"
+            container_name="redis_service"
+            ;;
+        "api")
+            cmd="sudo docker run -d --network app-network --restart always --name api -p 8000:80 571664317480.dkr.ecr.${aws_region}.amazonaws.com/iykonect-images:api"
+            container_name="api"
+            ;;
+        "prometheus")
+            cmd="sudo docker run -d --network app-network --restart always --name prometheus -p 9090:9090 571664317480.dkr.ecr.${aws_region}.amazonaws.com/iykonect-images:prometheus"
+            container_name="prometheus"
+            ;;
+        "grafana")
+            cmd="sudo docker run -d --network app-network --restart always --name iykon-graphana-app -p 3100:3000 --user root 571664317480.dkr.ecr.${aws_region}.amazonaws.com/iykonect-images:grafana"
             container_name="iykon-graphana-app"
-        fi
-        if ! check_container "$container_name"; then
-            echo "[$(date)] ERROR: Container $container_name failed health check"
+            ;;
+    esac
+
+    if [ ! -z "$cmd" ]; then
+        if output=$(eval "$cmd" 2>&1); then
+            echo "[$(date)] $service container started successfully"
+            echo "Container ID: $output"
+            
+            # Verify container is running properly
+            if ! check_container "$container_name"; then
+                echo "[$(date)] ERROR: Container $container_name failed health check"
+                exit 1
+            fi
+        else
+            echo "[$(date)] ERROR: Failed to start $service container"
+            echo "Error details: $output"
             exit 1
         fi
-    else
-        echo "[$(date)] ERROR: Failed to start $container container"
-        echo "Error details: $output"
-        exit 1
     fi
 done
 
