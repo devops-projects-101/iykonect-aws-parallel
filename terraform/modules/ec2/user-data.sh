@@ -39,7 +39,7 @@ done
 
 # Define container configurations
 declare -A containers=(
-    ["redis"]="--name redis_service -p 6379:6379 -e REDIS_PASSWORD=IYKONECTpassword --cmd 'redis-server --requirepass IYKONECTpassword --bind 0.0.0.0'"
+    ["redis"]="--name redis_service -p 6379:6379 -e REDIS_PASSWORD=IYKONECTpassword"
     ["api"]="--name api -p 8000:80"
     ["prometheus"]="--name prometheus -p 9090:9090"
     ["grafana"]="--name iykon-graphana-app -p 3100:3000 --user root"
@@ -73,12 +73,12 @@ check_container() {
 echo "[$(date)] Starting containers"
 for container in "${!containers[@]}"; do
     echo "[$(date)] Starting $container container"
-    cmd="sudo docker run -d --network app-network --restart always ${containers[$container]} 571664317480.dkr.ecr.${aws_region}.amazonaws.com/iykonect-images:$container"
-    
     if [ "$container" = "redis" ]; then
-        cmd="$cmd redis-server --requirepass IYKONECTpassword --bind 0.0.0.0"
+        cmd="sudo docker run -d --network app-network --restart always ${containers[$container]} 571664317480.dkr.ecr.${aws_region}.amazonaws.com/iykonect-images:$container redis-server --requirepass IYKONECTpassword --bind 0.0.0.0"
+    else
+        cmd="sudo docker run -d --network app-network --restart always ${containers[$container]} 571664317480.dkr.ecr.${aws_region}.amazonaws.com/iykonect-images:$container"
     fi
-    
+
     if output=$(eval "$cmd" 2>&1); then
         echo "[$(date)] $container container started successfully"
         echo "Container ID: $output"
