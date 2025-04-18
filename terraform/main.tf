@@ -45,8 +45,8 @@ resource "null_resource" "credentials_upload" {
   triggers = {
     aws_access_key = var.aws_access_key
     aws_secret_key = var.aws_secret_key
-    docker_username = var.docker_username
-    docker_password = var.docker_password
+    aws_region = var.aws_region
+    efs_dns_name = module.efs.dns_name
   }
 
   provisioner "local-exec" {
@@ -56,8 +56,7 @@ resource "null_resource" "credentials_upload" {
       export AWS_ACCESS_KEY_ID='${var.aws_access_key}'
       export AWS_SECRET_ACCESS_KEY='${var.aws_secret_key}'
       export AWS_DEFAULT_REGION='${var.aws_region}'
-      export DOCKER_USERNAME='${var.docker_username}'
-      export DOCKER_PASSWORD='${var.docker_password}'
+      export EFS_DNS_NAME='${module.efs.dns_name}'
       EOF
       aws s3 cp credentials.sh s3://iykonect-aws-parallel/credentials.sh
       rm credentials.sh

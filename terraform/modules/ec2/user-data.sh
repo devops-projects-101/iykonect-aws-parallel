@@ -5,109 +5,57 @@ log() {
     echo "[$(date)] $1" >> /var/log/user-data.log
 }
 
+# Initial setup
+sudo apt-get update
+sudo apt-get install -y docker.io awscli nfs-common jq
+sudo systemctl start docker
+sudo systemctl enable docker
+log "Installed required packages"
+
 log "START - user data execution"
 
-# Get AWS credentials from template
-export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}"
-export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}"
-export AWS_DEFAULT_REGION="${AWS_REGION}"
-export AWS_REGION="${AWS_REGION}"
 
 # Fetch credentials from S3
 log "Fetching credentials from S3"
 aws s3 cp s3://iykonect-aws-parallel/credentials.sh /root/credentials.sh
 chmod 600 /root/credentials.sh
+
+# Load credentials
 source /root/credentials.sh
-rm /root/credentials.sh
+log "Credentials loaded successfully"
 
-# Validate credentials
-if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
-    log "ERROR: Failed to load credentials from S3"
-    exit 1
-fi
 
-# Validate required AWS credentials
-validate_aws_inputs() {
-    missing=""
-    
-    if [ -z "${AWS_ACCESS_KEY_ID}" ]; then
-        missing="$missing AWS_ACCESS_KEY_ID"
-    fi
-    if [ -z "${AWS_SECRET_ACCESS_KEY}" ]; then
-        missing="$missing AWS_SECRET_ACCESS_KEY"
-    fi
-    if [ -z "${AWS_REGION}" ]; then
-        missing="$missing AWS_REGION"
-    fi
-    
-    if [ ! -z "$missing" ]; then
-        log "ERROR: Missing required AWS credentials:$missing"
-        return 1
-    fi
-    
-    log "AWS credentials validation passed"
-    return 0
-}
 
-if ! validate_aws_inputs; then
-    exit 1
-fi
-
-# Initial setup
-sudo apt-get update
-sudo apt-get install -y docker.io awscli nfs-common
-sudo systemctl start docker
-sudo systemctl enable docker
-log "Installed required packages"
-
-# Get region from instance metadata
-AWS_REGION=$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/document | jq -r .region)
-log "Running in AWS region: $AWS_REGION"
-
-# Setup EFS
+# Setup mount point for EFS
 mount_point="/iykonect-data"
-log "Setting up EFS at $mount_point"
-
-# Mount EFS with retries
-mount_efs() {
-    max_attempts=5
-    attempt=1
-    mount_options="nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport"
-    
-    while [ $attempt -le $max_attempts ]; do
-        log "Attempting to mount EFS (Attempt $attempt/$max_attempts)"
-        
-        # Test EFS endpoint
-        if ! nc -zv "${EFS_DNS_NAME}" 2049 >/dev/null 2>&1; then
-            log "WARNING: EFS endpoint not reachable, waiting..."
-            sleep 10
-            attempt=$((attempt + 1))
-            continue
-        fi
-        
-        # Try mounting
-        if sudo mount -t nfs4 -o "$mount_options" "${EFS_DNS_NAME}:/" "$mount_point"; then
-            log "EFS mounted successfully"
-            echo "${EFS_DNS_NAME}:/ $mount_point nfs4 $mount_options,_netdev 0 0" | sudo tee -a /etc/fstab
-            return 0
-        fi
-        
-        log "Mount attempt $attempt failed, retrying..."
-        attempt=$((attempt + 1))
-        sleep 5
-    done
-    
-    log "ERROR: Failed to mount EFS after $max_attempts attempts"
-    return 1
-}
-
-# Create mount point and attempt mount
 sudo mkdir -p $mount_point
-if ! mount_efs; then
+log "Created mount point at $mount_point"
+
+# Mount EFS
+log "Mounting EFS filesystem at ${EFS_DNS_NAME}"
+if ! sudo mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport "${EFS_DNS_NAME}:/" $mount_point; then
+    log "ERROR: Failed to mount EFS"
     exit 1
 fi
+log "EFS mounted successfully"
 
-# Configure Docker
+
+# Configure AWS CLI
+log "Configuring AWS CLI"
+aws configure set aws_access_key_id "${AWS_ACCESS_KEY_ID}"
+aws configure set aws_secret_access_key "${AWS_SECRET_ACCESS_KEY}"
+aws configure set region "${AWS_REGION}"
+aws configure set output "json"
+
+# Verify AWS configuration
+if ! aws sts get-caller-identity > /dev/null 2>&1; then
+    log "ERROR: AWS CLI configuration failed"
+    exit 1
+fi
+log "AWS CLI configured successfully"
+
+# Setup Docker 
+log "Configuring Docker with EFS storage"
 sudo mkdir -p /etc/docker
 cat << EOF | sudo tee /etc/docker/daemon.json
 {
@@ -116,67 +64,22 @@ cat << EOF | sudo tee /etc/docker/daemon.json
 }
 EOF
 
-# Setup Docker directories
 sudo mkdir -p $mount_point/{docker,data,logs}
 sudo chown -R root:root $mount_point/docker
 sudo systemctl restart docker
 
-# Configure AWS CLI with proper validation
-configure_aws() {
-    log "Setting up AWS credentials with: region=${AWS_REGION}"
-    
-    # Export credentials for root user
-    sudo bash -c "export AWS_ACCESS_KEY_ID='${AWS_ACCESS_KEY_ID}'"
-    sudo bash -c "export AWS_SECRET_ACCESS_KEY='${AWS_SECRET_ACCESS_KEY}'"
-    sudo bash -c "export AWS_DEFAULT_REGION='${AWS_REGION}'"
-
-    # Write root user credentials
-    sudo mkdir -p /root/.aws
-    sudo bash -c "cat > /root/.aws/credentials << 'EOF'
-[default]
-aws_access_key_id = ${AWS_ACCESS_KEY_ID}
-aws_secret_access_key = ${AWS_SECRET_ACCESS_KEY}
-EOF"
-    sudo chmod 600 /root/.aws/credentials
-
-    # Write root user config
-    sudo bash -c "cat > /root/.aws/config << 'EOF'
-[default]
-region = ${AWS_REGION}
-output = json
-EOF"
-    sudo chmod 600 /root/.aws/config
-
-    # Verify credentials
-    if sudo -E aws sts get-caller-identity; then
-        log "AWS credentials verified successfully"
-        return 0
-    fi
-    
-    log "ERROR: AWS credentials verification failed"
-    return 1
-}
-
-# Run AWS configuration
-if ! configure_aws; then
-    exit 1
-fi
-
 # Create docker network
 sudo docker network create app-network
 
-# Pull images and run containers (no explicit login needed with IAM role)
-log "Starting to pull images from ECR"
+# Pull and run containers
+log "Starting to pull and run containers"
 for service in redis prometheus grafana api react-app; do
-    log "Pulling image: $service"
-    if sudo docker pull 571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:$service; then
-        log "Successfully pulled $service"
-    else
+    log "Deploying $service"
+    if ! sudo docker pull 571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:$service; then
         log "ERROR: Failed to pull $service"
         exit 1
     fi
 
-    log "Starting $service container"
     case $service in
         "redis")
             cmd="sudo docker run -d --network app-network --restart always --name redis_service -p 6379:6379 -e REDIS_PASSWORD=IYKONECTpassword 571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:redis redis-server --requirepass IYKONECTpassword --bind 0.0.0.0"
@@ -192,32 +95,18 @@ for service in redis prometheus grafana api react-app; do
             ;;
     esac
 
-    if [ ! -z "$cmd" ]; then
-        if eval "$cmd"; then
-            log "$service container started successfully"
-        else
-            log "ERROR: Failed to start $service container"
-            exit 1
-        fi
+    if [ ! -z "$cmd" ] && ! eval "$cmd"; then
+        log "ERROR: Failed to start $service"
+        exit 1
     fi
+    log "$service deployed successfully"
 done
 
-# Run Grafana Renderer (non-ECR image)
-log "Starting Grafana Renderer container"
-if sudo docker run -d \
-    --name renderer \
-    --network app-network \
-    -p 8081:8081 \
-    --restart always \
-    grafana/grafana-image-renderer:latest; then
-    log "Grafana Renderer container started successfully"
-else
-    log "ERROR: Failed to start Grafana Renderer container"
+# Deploy Grafana Renderer
+log "Deploying Grafana Renderer"
+if ! sudo docker run -d --name renderer --network app-network -p 8081:8081 --restart always grafana/grafana-image-renderer:latest; then
+    log "ERROR: Failed to start Grafana Renderer"
     exit 1
 fi
-
-# Create required directories and set permissions
-sudo mkdir -p /home/ubuntu/logs /home/ubuntu/grafana/{provisioning/datasources,provisioning/dashboards,dashboards}
-sudo chown -R ubuntu:ubuntu /home/ubuntu/logs /home/ubuntu/grafana
 
 log "END - user data execution"

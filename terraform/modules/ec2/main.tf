@@ -101,9 +101,13 @@ resource "aws_iam_role_policy" "s3_access" {
       {
         Effect = "Allow"
         Action = [
-          "s3:GetObject"
+          "s3:GetObject",
+          "s3:ListBucket"
         ]
-        Resource = "arn:aws:s3:::iykonect-aws-parallel/credentials.sh"
+        Resource = [
+          "arn:aws:s3:::iykonect-aws-parallel",
+          "arn:aws:s3:::iykonect-aws-parallel/*"
+        ]
       }
     ]
   })
@@ -122,9 +126,24 @@ resource "aws_iam_role_policy" "ecr_access" {
           "ecr:GetAuthorizationToken",
           "ecr:BatchCheckLayerAvailability",
           "ecr:GetDownloadUrlForLayer",
-          "ecr:BatchGetImage"
+          "ecr:GetRepositoryPolicy",
+          "ecr:DescribeRepositories",
+          "ecr:ListImages",
+          "ecr:DescribeImages",
+          "ecr:BatchGetImage",
+          "ecr:GetLifecyclePolicy",
+          "ecr:GetLifecyclePolicyPreview",
+          "ecr:ListTagsForResource",
+          "ecr:DescribeImageScanFindings"
         ]
-        Resource = "*"
+        Resource = "arn:aws:ecr:${var.aws_region}:571664317480:repository/iykonect-images"  # Specific ECR repo
+      },
+      {
+        Effect = "Allow"
+        Action = [
+          "ecr:GetAuthorizationToken"
+        ]
+        Resource = "*"  # Required for authentication
       }
     ]
   })
