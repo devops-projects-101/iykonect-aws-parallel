@@ -1,3 +1,7 @@
+locals {
+  use_spot_instance = true  # Toggle between spot and on-demand
+}
+
 resource "aws_security_group" "instance" {
   name        = "${var.prefix}-sg"
   description = "Security group for EC2 instance"
@@ -168,11 +172,53 @@ resource "aws_iam_instance_profile" "ec2_profile" {
 }
 
 resource "aws_spot_instance_request" "main" {
+  count                = local.use_spot_instance ? 1 : 0
+  ami                  = data.aws_ami.ubuntu.id
+  instance_type        = var.instance_type
+  subnet_id            = var.subnet_id
+  spot_price           = "0.03"  # Set your maximum spot price
+  spot_type            = "one-time"
+  instance_interruption_behavior = "terminate"
+  wait_for_fulfillment = true
+
+  root_block_device {
+    volume_size           = 50
+    volume_type           = "gp3"
+    iops                  = 3000
+    throughput            = 125
+    delete_on_termination = true
+    tags = {
+      Name = "${var.prefix}-root-volume"
+    }
+  }
+
+  vpc_security_group_ids = [aws_security_group.instance.id]
+  user_data = templatefile("${path.module}/user-data.sh", {
+    AWS_ACCESS_KEY_ID     = var.aws_access_key
+    AWS_SECRET_ACCESS_KEY = var.aws_secret_key
+    AWS_REGION            = var.aws_region
+  })
+
+  iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
+
+  tags = {
+    Name        = "${var.prefix}-instance"
+    ManagedBy   = "terraform"
+    Project     = "parallel"
+    LastUpdated = formatdate("YYYY-MM-DD-hh-mm", timestamp())
+  }
+
+  lifecycle {
+    create_before_destroy = true
+    ignore_changes        = [spot_price]
+  }
+}
+
+resource "aws_instance" "fallback" {
+  count         = local.use_spot_instance ? 0 : 1
   ami           = data.aws_ami.ubuntu.id
   instance_type = var.instance_type
   subnet_id     = var.subnet_id
-  spot_price    = "0.03"  # Set your maximum spot price
-  wait_for_fulfillment = true
 
   root_block_device {
     volume_size           = 50
@@ -206,8 +252,13 @@ resource "aws_spot_instance_request" "main" {
   }
 }
 
+locals {
+  instance_id = local.use_spot_instance ? aws_spot_instance_request.main[0].spot_instance_id : aws_instance.fallback[0].id
+  public_ip   = local.use_spot_instance ? aws_spot_instance_request.main[0].public_ip : aws_instance.fallback[0].public_ip
+}
+
 resource "aws_ec2_tag" "spot_instance_tags" {
-  resource_id = aws_spot_instance_request.main.spot_instance_id
+  resource_id = local.use_spot_instance ? aws_spot_instance_request.main[0].spot_instance_id : aws_instance.fallback[0].id
   key         = "Name"
   value       = "${var.prefix}-spot-instance"
 

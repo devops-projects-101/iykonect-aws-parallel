@@ -1,13 +1,13 @@
 output "instance_id" {
-  value = aws_spot_instance_request.main.spot_instance_id
+  value = local.instance_id
 }
 
 output "public_ip" {
-  value = aws_spot_instance_request.main.public_ip
+  value = local.public_ip
 }
 
 output "api_endpoint" {
-  value = "http://${aws_spot_instance_request.main.public_ip}:8000"
+  value = "http://${local.public_ip}:8000"
 }
 
 output "prometheus_endpoint" {
