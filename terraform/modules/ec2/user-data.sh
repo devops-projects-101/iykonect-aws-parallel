@@ -9,15 +9,15 @@ log "START - user data execution"
 
 # Validate required AWS credentials
 validate_aws_inputs() {
-    local missing_vars=()
-    
-    [ -z "${aws_access_key}" ] && missing_vars+=("aws_access_key")
-    [ -z "${aws_secret_key}" ] && missing_vars+=("aws_secret_key")
-    [ -z "${aws_region}" ] && missing_vars+=("aws_region")
+    declare -a missing_vars
+
+    [ -z "${aws_access_key}" ] && missing_vars[${#missing_vars[@]}]="aws_access_key"
+    [ -z "${aws_secret_key}" ] && missing_vars[${#missing_vars[@]}]="aws_secret_key"
+    [ -z "${aws_region}" ] && missing_vars[${#missing_vars[@]}]="aws_region"
     
     if [ ${#missing_vars[@]} -ne 0 ]; then
         log "ERROR: Missing required AWS credentials:"
-        printf '%s\n' "${missing_vars[@]}" | while read var; do
+        for var in "${missing_vars[@]}"; do
             log "  - $var"
         done
         return 1
@@ -44,15 +44,15 @@ log "Setting up EFS at $mount_point"
 
 # Mount EFS with retries
 mount_efs() {
-    local max_attempts=5
-    local attempt=1
-    local mount_options="nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport"
+    max_attempts=5
+    attempt=1
+    mount_options="nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport"
     
     while [ $attempt -le $max_attempts ]; do
         log "Attempting to mount EFS (Attempt $attempt/$max_attempts)"
         
         # Test EFS endpoint
-        if ! nc -zv ${efs_dns_name} 2049 >/dev/null 2>&1; then
+        if ! nc -zv "${efs_dns_name}" 2049 >/dev/null 2>&1; then
             log "WARNING: EFS endpoint not reachable, waiting..."
             sleep 10
             attempt=$((attempt + 1))
@@ -60,7 +60,7 @@ mount_efs() {
         fi
         
         # Try mounting
-        if sudo mount -t nfs4 -o $mount_options "${efs_dns_name}:/" $mount_point; then
+        if sudo mount -t nfs4 -o "$mount_options" "${efs_dns_name}:/" "$mount_point"; then
             log "EFS mounted successfully"
             echo "${efs_dns_name}:/ $mount_point nfs4 $mount_options,_netdev 0 0" | sudo tee -a /etc/fstab
             return 0
@@ -100,10 +100,10 @@ configure_aws() {
     log "Setting up AWS credentials"
     
     # Set AWS environment variables first
-    export AWS_DEFAULT_REGION=${aws_region}
-    export AWS_REGION=${aws_region}
-    export AWS_ACCESS_KEY_ID=${aws_access_key}
-    export AWS_SECRET_ACCESS_KEY=${aws_secret_key}
+    export AWS_DEFAULT_REGION="${aws_region}"
+    export AWS_REGION="${aws_region}"
+    export AWS_ACCESS_KEY_ID="${aws_access_key}"
+    export AWS_SECRET_ACCESS_KEY="${aws_secret_key}"
 
     # Create AWS config directory with proper permissions
     mkdir -p /root/.aws
@@ -128,7 +128,7 @@ EOF
     # Verify credentials work
     for i in {1..3}; do
         log "Verifying AWS credentials (attempt $i/3)"
-        if aws sts get-caller-identity --region ${aws_region} >/dev/null 2>&1; then
+        if aws sts get-caller-identity --region "${aws_region}" >/dev/null 2>&1; then
             log "AWS credentials verified successfully"
             return 0
         fi
@@ -145,7 +145,7 @@ if ! configure_aws; then
 fi
 
 # Login to ECR
-aws ecr get-login-password --region ${aws_region} | sudo docker login --username AWS --password-stdin 571664317480.dkr.ecr.${aws_region}.amazonaws.com
+aws ecr get-login-password --region "${aws_region}" | sudo docker login --username AWS --password-stdin 571664317480.dkr.ecr."${aws_region}".amazonaws.com
 
 # Create docker network
 sudo docker network create app-network
@@ -154,7 +154,7 @@ sudo docker network create app-network
 log "Starting to pull images from ECR"
 for service in redis prometheus grafana api react-app; do
     log "Pulling image: $service"
-    if sudo docker pull 571664317480.dkr.ecr.${aws_region}.amazonaws.com/iykonect-images:$service; then
+    if sudo docker pull 571664317480.dkr.ecr."${aws_region}".amazonaws.com/iykonect-images:"$service"; then
         log "Successfully pulled $service"
     else
         log "ERROR: Failed to pull $service"
