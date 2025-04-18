@@ -52,67 +52,14 @@ jobs:
         aws s3api head-bucket --bucket iykonect-aws-parallel 2>/dev/null || \
         aws s3api create-bucket --bucket iykonect-aws-parallel --region us-east-1
 
-    - name: Create and upload credentials file
-      run: |
-        # Create credentials file directly in S3 using AWS CLI
-        aws s3 cp - s3://iykonect-aws-parallel/credentials.sh <<EOF
-          #!/bin/bash
-          export AWS_ACCESS_KEY_ID='${{ secrets.AWS_ACCESS_KEY_ID }}'
-          export AWS_SECRET_ACCESS_KEY='${{ secrets.AWS_SECRET_ACCESS_KEY }}'
-          export AWS_REGION='eu-west-1'
-          export AWS_DEFAULT_REGION='eu-west-1'
-        EOF
-
-        # Verify upload
-        if ! aws s3api head-object --bucket iykonect-aws-parallel --key credentials.sh; then
-          echo "ERROR: Failed to verify credentials.sh in S3"
-          exit 1
-        fi
-        echo "Successfully created credentials file in S3"
-
-    - name: Validate credentials file in S3
-      run: |
-        echo "Downloading credentials file for validation..."
-        aws s3 cp s3://iykonect-aws-parallel/credentials.sh ./credentials_check.sh
-        
-        # Check file exists
-        if [ ! -f "./credentials_check.sh" ]; then
-          echo "ERROR: Failed to download credentials.sh"
-          exit 1
-        fi
-        
-        # Validate AWS_ACCESS_KEY_ID
-        if ! grep -q "AWS_ACCESS_KEY_ID='" ./credentials_check.sh || grep -q "AWS_ACCESS_KEY_ID=''" ./credentials_check.sh; then
-          echo "ERROR: AWS_ACCESS_KEY_ID is missing or empty"
-          rm ./credentials_check.sh
-          exit 1
-        fi
-        
-        # Validate AWS_SECRET_ACCESS_KEY
-        if ! grep -q "AWS_SECRET_ACCESS_KEY='" ./credentials_check.sh || grep -q "AWS_SECRET_ACCESS_KEY=''" ./credentials_check.sh; then
-          echo "ERROR: AWS_SECRET_ACCESS_KEY is missing or empty"
-          rm ./credentials_check.sh
-          exit 1
-        fi
-        
-        # Validate AWS_REGION and AWS_DEFAULT_REGION
-        if ! grep -q "AWS_REGION='eu-west-1'" ./credentials_check.sh || ! grep -q "AWS_DEFAULT_REGION='eu-west-1'" ./credentials_check.sh; then
-          echo "ERROR: AWS region settings are incorrect"
-          rm ./credentials_check.sh
-          exit 1
-        fi
-        
-        echo "All credentials validated successfully"
-        rm ./credentials_check.sh
+    - name: Terraform Init
+      id: init
+      run: terraform init
 
     # - name: Terraform Format
     #   id: fmt
     #   run: terraform fmt -check
     #   continue-on-error: true
-
-    - name: Terraform Init
-      id: init
-      run: terraform init
 
     - name: Terraform Validate
       id: validate

@@ -8,10 +8,18 @@ fi
 set -x
 set -e
 
+# Configure AWS credentials directly
+export AWS_ACCESS_KEY_ID='${AWS_ACCESS_KEY_ID}'
+export AWS_SECRET_ACCESS_KEY='${AWS_SECRET_ACCESS_KEY}'
+export AWS_REGION='${AWS_REGION}'
+export AWS_DEFAULT_REGION='${AWS_REGION}'
+
 # Logging function with proper permissions
 log() {
     echo "[$(date)] $1" | sudo tee -a /var/log/user-data.log
 }
+
+log "AWS credentials configured with region: ${AWS_REGION}"
 
 # Initial setup
 apt-get update
@@ -46,9 +54,6 @@ while [ $attempt -le $max_attempts ]; do
     [ $attempt -lt $max_attempts ] && sleep 10
     attempt=$((attempt + 1))
 done
-
-AWS_REGION='eu-west-1'
-
 
 if [ $attempt -gt $max_attempts ]; then
     log "ERROR: Failed to download credentials after $max_attempts attempts"
