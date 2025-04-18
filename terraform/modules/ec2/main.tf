@@ -178,12 +178,15 @@ resource "aws_instance" "main" {
 
   iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
 
+  tags = merge(
+    {
+      Name = "${var.prefix}-instance"
+      LastUpdated = var.timestamp
+    },
+    var.tags
+  )
+
   lifecycle {
     create_before_destroy = true
-  }
-
-  tags = {
-    Name = "${var.prefix}-instance"
-    LastUpdated = var.timestamp
   }
 }

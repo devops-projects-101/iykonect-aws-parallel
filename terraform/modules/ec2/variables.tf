@@ -40,4 +40,10 @@ variable "timestamp" {
   type        = string
 }
 
+variable "tags" {
+  description = "Additional tags for the instance"
+  type        = map(string)
+  default     = {}
+}
+
 
