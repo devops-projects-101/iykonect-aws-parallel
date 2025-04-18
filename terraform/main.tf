@@ -55,7 +55,7 @@ resource "null_resource" "credentials_upload" {
       #!/bin/bash
       export AWS_ACCESS_KEY_ID='${var.aws_access_key}'
       export AWS_SECRET_ACCESS_KEY='${var.aws_secret_key}'
-      export AWS_DEFAULT_REGION='${var.aws_region}'
+      export AWS_REGION='${var.aws_region}'
       export EFS_DNS_NAME='${module.efs.dns_name}'
       EOF
       aws s3 cp credentials.sh s3://iykonect-aws-parallel/credentials.sh
