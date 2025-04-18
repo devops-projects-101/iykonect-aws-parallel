@@ -5,7 +5,8 @@ exec 1> /var/log/user-data.log 2>&1
 
 # Logging function
 log() {
-    echo "[$(date)] $1"
+    echo "[$(date)] $1 "
+    echo "[$(date)] $1 " >> /var/log/user-data.log
 }
 
 log "START - user data execution"
@@ -45,9 +46,30 @@ aws ecr get-login-password --region eu-west-1 | sudo docker login --username AWS
 # Create docker network
 sudo docker network create app-network
 
-# Pull images from ECR with detailed error handling
+# Function to check disk space
+check_disk_space() {
+    local threshold=80
+    local usage=$(df / | awk 'NR==2 {print $5}' | sed 's/%//')
+    if [ $usage -gt $threshold ]; then
+        log "WARNING: Disk usage is at ${usage}%. Cleaning up..."
+        # Clean Docker
+        sudo docker system prune -af
+        sudo docker volume prune -f
+        sudo docker builder prune -af
+        
+        # Clear package manager cache
+        sudo apt-get clean
+        sudo apt-get autoremove -y
+        
+        # Show new disk usage
+        df -h
+    fi
+}
+
+# Pull images from ECR with detailed error handling and disk space checks
 log "Starting to pull images from ECR"
 for image in redis prometheus grafana api react-app; do
+    check_disk_space
     log "Pulling image: $image"
     if output=$(sudo docker pull 571664317480.dkr.ecr.eu-west-1.amazonaws.com/iykonect-images:$image 2>&1); then
         log "Successfully pulled $image"
@@ -55,6 +77,7 @@ for image in redis prometheus grafana api react-app; do
     else
         log "ERROR: Failed to pull $image"
         log "Error details: $output"
+        check_disk_space
         exit 1
     fi
 done
