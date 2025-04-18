@@ -7,6 +7,30 @@ log() {
 
 log "START - user data execution"
 
+# Validate required AWS credentials
+validate_aws_inputs() {
+    local missing_vars=()
+    
+    [ -z "${aws_access_key}" ] && missing_vars+=("aws_access_key")
+    [ -z "${aws_secret_key}" ] && missing_vars+=("aws_secret_key")
+    [ -z "${aws_region}" ] && missing_vars+=("aws_region")
+    
+    if [ ${#missing_vars[@]} -ne 0 ]; then
+        log "ERROR: Missing required AWS credentials:"
+        printf '%s\n' "${missing_vars[@]}" | while read var; do
+            log "  - $var"
+        done
+        return 1
+    fi
+    
+    log "AWS credentials validation passed"
+    return 0
+}
+
+if ! validate_aws_inputs; then
+    exit 1
+fi
+
 # Initial setup
 sudo apt-get update
 sudo apt-get install -y docker.io awscli nfs-common
