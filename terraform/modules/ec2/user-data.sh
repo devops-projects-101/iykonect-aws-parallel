@@ -34,11 +34,31 @@ sudo systemctl enable docker
 log "Installed required packages"
 
 # Configure AWS CLI
-aws_region="eu-west-1"
-aws configure set aws_access_key_id "${aws_access_key}"
-aws configure set aws_secret_access_key "${aws_secret_key}"
-aws configure set region "eu-west-1"
-log "Configured AWS CLI"
+log "Configuring AWS CLI"
+mkdir -p /root/.aws
+cat > /root/.aws/credentials << EOF
+[default]
+aws_access_key_id = ${aws_access_key}
+aws_secret_access_key = ${aws_secret_key}
+EOF
+
+cat > /root/.aws/config << EOF
+[default]
+region = eu-west-1
+output = json
+EOF
+
+chmod 600 /root/.aws/credentials
+chmod 600 /root/.aws/config
+log "AWS CLI credentials configured"
+
+# Verify AWS CLI configuration
+if aws sts get-caller-identity > /dev/null 2>&1; then
+    log "AWS CLI configuration verified successfully"
+else
+    log "ERROR: AWS CLI configuration failed"
+    exit 1
+fi
 
 # Configure AWS CLI and authenticate with ECR
 aws ecr get-login-password --region eu-west-1 | sudo docker login --username AWS --password-stdin 571664317480.dkr.ecr.eu-west-1.amazonaws.com
@@ -48,10 +68,9 @@ sudo docker network create app-network
 
 # Function to check disk space
 check_disk_space() {
-    local threshold=80
-    local usage=$(df / | awk 'NR==2 {print $5}' | sed 's/%//')
-    if [ $usage -gt $threshold ]; then
-        log "WARNING: Disk usage is at ${usage}%. Cleaning up..."
+    USAGE=$(df / | awk 'NR==2 {print $5}' | sed 's/%//')
+    if [ "$USAGE" -gt 80 ]; then
+        log "WARNING: Disk usage is at $USAGE%. Cleaning up..."
         # Clean Docker
         sudo docker system prune -af
         sudo docker volume prune -f
