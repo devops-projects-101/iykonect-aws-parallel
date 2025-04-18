@@ -81,13 +81,10 @@ resource "aws_instance" "main" {
 
   vpc_security_group_ids = [aws_security_group.instance.id]
   user_data = templatefile("${path.module}/user-data.sh", {
-    docker_compose_content = var.docker_compose_content
-    docker_username       = var.docker_username
-    docker_password       = var.docker_password
-    aws_access_key       = var.aws_access_key
-    aws_secret_key       = var.aws_secret_key
-    aws_region           = var.aws_region
-    efs_dns_name         = var.efs_dns_name
+    aws_access_key = var.aws_access_key
+    aws_secret_key = var.aws_secret_key
+    aws_region     = var.aws_region
+    efs_dns_name   = var.efs_dns_name
   })
 
   tags = {

@@ -100,45 +100,37 @@ sudo systemctl restart docker
 
 # Configure AWS CLI with proper validation
 configure_aws() {
-    log "Setting up AWS credentials"
+    log "Setting up AWS credentials with: region=${aws_region}"
     
-    # Set AWS environment variables first
-    export AWS_DEFAULT_REGION="${aws_region}"
-    export AWS_REGION="${aws_region}"
-    export AWS_ACCESS_KEY_ID="${aws_access_key}"
-    export AWS_SECRET_ACCESS_KEY="${aws_secret_key}"
+    # Export credentials for root user
+    sudo bash -c "export AWS_ACCESS_KEY_ID='${aws_access_key}'"
+    sudo bash -c "export AWS_SECRET_ACCESS_KEY='${aws_secret_key}'"
+    sudo bash -c "export AWS_DEFAULT_REGION='${aws_region}'"
 
-    # Create AWS config directory with proper permissions
-    mkdir -p /root/.aws
-    chmod 700 /root/.aws
-
-    # Write credentials file
-    cat > /root/.aws/credentials << EOF
+    # Write root user credentials
+    sudo mkdir -p /root/.aws
+    sudo bash -c "cat > /root/.aws/credentials << 'EOF'
 [default]
 aws_access_key_id = ${aws_access_key}
 aws_secret_access_key = ${aws_secret_key}
-EOF
-    chmod 600 /root/.aws/credentials
+EOF"
+    sudo chmod 600 /root/.aws/credentials
 
-    # Write config file
-    cat > /root/.aws/config << EOF
+    # Write root user config
+    sudo bash -c "cat > /root/.aws/config << 'EOF'
 [default]
 region = ${aws_region}
 output = json
-EOF
-    chmod 600 /root/.aws/config
+EOF"
+    sudo chmod 600 /root/.aws/config
 
-    # Verify credentials work
-    for i in {1..3}; do
-        log "Verifying AWS credentials (attempt $i/3)"
-        if aws sts get-caller-identity --region "${aws_region}" >/dev/null 2>&1; then
-            log "AWS credentials verified successfully"
-            return 0
-        fi
-        sleep 5
-    done
-
-    log "ERROR: Failed to validate AWS credentials after 3 attempts"
+    # Verify credentials
+    if sudo -E aws sts get-caller-identity; then
+        log "AWS credentials verified successfully"
+        return 0
+    fi
+    
+    log "ERROR: AWS credentials verification failed"
     return 1
 }
 
