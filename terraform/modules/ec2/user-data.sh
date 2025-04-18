@@ -1,62 +1,70 @@
 #!/bin/bash
 sudo apt-get update
-sudo apt-get install -y docker.io
+sudo apt-get install -y docker.io awscli
 sudo systemctl start docker
 sudo systemctl enable docker
 
-# Docker Hub login
-echo "${docker_password}" | sudo docker login -u ${docker_username} --password-stdin
+# Configure AWS CLI
+aws configure set aws_access_key_id "${aws_access_key}"
+aws configure set aws_secret_access_key "${aws_secret_key}"
+aws configure set region "${aws_region}"
+
+# Configure AWS CLI and authenticate with ECR
+aws ecr get-login-password --region ${aws_region} | sudo docker login --username AWS --password-stdin 571664317480.dkr.ecr.${aws_region}.amazonaws.com
 
 # Create docker network
-sudo docker network create iykonect-network
+sudo docker network create app-network
+
+# Pull images from ECR
+sudo docker pull 571664317480.dkr.ecr.${aws_region}.amazonaws.com/iykonect-images:redis
+sudo docker pull 571664317480.dkr.ecr.${aws_region}.amazonaws.com/iykonect-images:prometheus
+sudo docker pull 571664317480.dkr.ecr.${aws_region}.amazonaws.com/iykonect-images:grafana
+sudo docker pull 571664317480.dkr.ecr.${aws_region}.amazonaws.com/iykonect-images:api
+sudo docker pull 571664317480.dkr.ecr.${aws_region}.amazonaws.com/iykonect-images:react-app
 
 # Run Redis
 sudo docker run -d \
-  --name redis \
-  --network iykonect-network \
+  --name redis_service \
+  --network app-network \
   -p 6379:6379 \
+  -e REDIS_PASSWORD=IYKONECTpassword \
   --restart always \
-  redis:latest
+  571664317480.dkr.ecr.${aws_region}.amazonaws.com/iykonect-images:redis \
+  redis-server --requirepass IYKONECTpassword --bind 0.0.0.0
 
 # Run API
 sudo docker run -d \
   --name api \
-  --network iykonect-network \
-  -p 8080:80 \
+  --network app-network \
+  -p 8000:80 \
   --restart always \
-  iykonect/iykonect-api:latest
-
-# Run Postgres
-sudo docker run -d \
-  --name postgres \
-  --network iykonect-network \
-  -p 5432:5432 \
-  -e POSTGRES_DB=sonarqube \
-  -e POSTGRES_USER=sonarqube \
-  -e POSTGRES_PASSWORD=sonarqube \
-  --restart always \
-  postgres:13
-
-# Run SonarQube
-sudo docker run -d \
-  --name sonarqube \
-  --network iykonect-network \
-  -p 9000:9000 \
-  --restart always \
-  sonarqube:community
+  571664317480.dkr.ecr.${aws_region}.amazonaws.com/iykonect-images:api
 
 # Run Prometheus
 sudo docker run -d \
   --name prometheus \
-  --network iykonect-network \
+  --network app-network \
   -p 9090:9090 \
   --restart always \
-  prom/prometheus:latest
+  571664317480.dkr.ecr.${aws_region}.amazonaws.com/iykonect-images:prometheus
+
+# Run Grafana Renderer
+sudo docker run -d \
+  --name renderer \
+  --network app-network \
+  -p 8081:8081 \
+  --restart always \
+  grafana/grafana-image-renderer:latest
 
 # Run Grafana
 sudo docker run -d \
-  --name grafana \
-  --network iykonect-network \
-  -p 3000:3000 \
+  --name iykon-graphana-app \
+  --network app-network \
+  -p 3100:3000 \
+  --user root \
   --restart always \
-  grafana/grafana-oss:11.0.0-ubuntu
+  571664317480.dkr.ecr.${aws_region}.amazonaws.com/iykonect-images:grafana
+
+# Create required directories and set permissions
+sudo mkdir -p /home/ubuntu/logs /home/ubuntu/grafana/{provisioning/datasources,provisioning/dashboards,dashboards}
+sudo chown -R ubuntu:ubuntu /home/ubuntu/logs /home/ubuntu/grafana
