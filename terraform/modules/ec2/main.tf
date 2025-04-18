@@ -142,10 +142,10 @@ resource "aws_instance" "main" {
 
   vpc_security_group_ids = [aws_security_group.instance.id]
   user_data = templatefile("${path.module}/user-data.sh", {
-    aws_access_key = var.aws_access_key
-    aws_secret_key = var.aws_secret_key
-    aws_region     = var.aws_region
-    efs_dns_name   = var.efs_dns_name
+    AWS_ACCESS_KEY_ID     = var.aws_access_key
+    AWS_SECRET_ACCESS_KEY = var.aws_secret_key
+    AWS_REGION            = var.aws_region
+    EFS_DNS_NAME          = var.efs_dns_name
   })
 
   iam_instance_profile = aws_iam_instance_profile.ec2_profile.name

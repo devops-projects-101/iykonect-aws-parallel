@@ -7,6 +7,12 @@ log() {
 
 log "START - user data execution"
 
+# Get AWS credentials from template
+export AWS_ACCESS_KEY_ID="${AWS_ACCESS_KEY_ID}"
+export AWS_SECRET_ACCESS_KEY="${AWS_SECRET_ACCESS_KEY}"
+export AWS_DEFAULT_REGION="${AWS_REGION}"
+export AWS_REGION="${AWS_REGION}"
+
 # Fetch credentials from S3
 log "Fetching credentials from S3"
 aws s3 cp s3://iykonect-aws-parallel/credentials.sh /root/credentials.sh
@@ -24,14 +30,14 @@ fi
 validate_aws_inputs() {
     missing=""
     
-    if [ -z "${aws_access_key}" ]; then
-        missing="$missing aws_access_key"
+    if [ -z "${AWS_ACCESS_KEY_ID}" ]; then
+        missing="$missing AWS_ACCESS_KEY_ID"
     fi
-    if [ -z "${aws_secret_key}" ]; then
-        missing="$missing aws_secret_key"
+    if [ -z "${AWS_SECRET_ACCESS_KEY}" ]; then
+        missing="$missing AWS_SECRET_ACCESS_KEY"
     fi
-    if [ -z "${aws_region}" ]; then
-        missing="$missing aws_region"
+    if [ -z "${AWS_REGION}" ]; then
+        missing="$missing AWS_REGION"
     fi
     
     if [ ! -z "$missing" ]; then
@@ -72,7 +78,7 @@ mount_efs() {
         log "Attempting to mount EFS (Attempt $attempt/$max_attempts)"
         
         # Test EFS endpoint
-        if ! nc -zv "${efs_dns_name}" 2049 >/dev/null 2>&1; then
+        if ! nc -zv "${EFS_DNS_NAME}" 2049 >/dev/null 2>&1; then
             log "WARNING: EFS endpoint not reachable, waiting..."
             sleep 10
             attempt=$((attempt + 1))
@@ -80,9 +86,9 @@ mount_efs() {
         fi
         
         # Try mounting
-        if sudo mount -t nfs4 -o "$mount_options" "${efs_dns_name}:/" "$mount_point"; then
+        if sudo mount -t nfs4 -o "$mount_options" "${EFS_DNS_NAME}:/" "$mount_point"; then
             log "EFS mounted successfully"
-            echo "${efs_dns_name}:/ $mount_point nfs4 $mount_options,_netdev 0 0" | sudo tee -a /etc/fstab
+            echo "${EFS_DNS_NAME}:/ $mount_point nfs4 $mount_options,_netdev 0 0" | sudo tee -a /etc/fstab
             return 0
         fi
         
@@ -117,26 +123,26 @@ sudo systemctl restart docker
 
 # Configure AWS CLI with proper validation
 configure_aws() {
-    log "Setting up AWS credentials with: region=${aws_region}"
+    log "Setting up AWS credentials with: region=${AWS_REGION}"
     
     # Export credentials for root user
-    sudo bash -c "export AWS_ACCESS_KEY_ID='${aws_access_key}'"
-    sudo bash -c "export AWS_SECRET_ACCESS_KEY='${aws_secret_key}'"
-    sudo bash -c "export AWS_DEFAULT_REGION='${aws_region}'"
+    sudo bash -c "export AWS_ACCESS_KEY_ID='${AWS_ACCESS_KEY_ID}'"
+    sudo bash -c "export AWS_SECRET_ACCESS_KEY='${AWS_SECRET_ACCESS_KEY}'"
+    sudo bash -c "export AWS_DEFAULT_REGION='${AWS_REGION}'"
 
     # Write root user credentials
     sudo mkdir -p /root/.aws
     sudo bash -c "cat > /root/.aws/credentials << 'EOF'
 [default]
-aws_access_key_id = ${aws_access_key}
-aws_secret_access_key = ${aws_secret_key}
+aws_access_key_id = ${AWS_ACCESS_KEY_ID}
+aws_secret_access_key = ${AWS_SECRET_ACCESS_KEY}
 EOF"
     sudo chmod 600 /root/.aws/credentials
 
     # Write root user config
     sudo bash -c "cat > /root/.aws/config << 'EOF'
 [default]
-region = ${aws_region}
+region = ${AWS_REGION}
 output = json
 EOF"
     sudo chmod 600 /root/.aws/config
