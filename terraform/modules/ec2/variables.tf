@@ -35,4 +35,9 @@ variable "aws_region" {
   default     = "eu-west-1"
 }
 
+variable "timestamp" {
+  description = "Timestamp to force instance recreation"
+  type        = string
+}
+
 

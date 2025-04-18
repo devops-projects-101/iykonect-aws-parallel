@@ -101,8 +101,11 @@ resource "aws_iam_role_policy" "s3_access" {
       {
         Effect = "Allow"
         Action = [
+          "s3:ListBucket",
           "s3:GetObject",
-          "s3:ListBucket"
+          "s3:GetBucketLocation",
+          "s3:ListBucketMultipartUploads",
+          "s3:ListBucketVersions"
         ]
         Resource = [
           "arn:aws:s3:::iykonect-aws-parallel",
@@ -175,7 +178,12 @@ resource "aws_instance" "main" {
 
   iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
 
+  lifecycle {
+    create_before_destroy = true
+  }
+
   tags = {
     Name = "${var.prefix}-instance"
+    LastUpdated = var.timestamp
   }
 }
