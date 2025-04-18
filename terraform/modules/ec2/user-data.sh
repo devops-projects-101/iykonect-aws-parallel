@@ -21,13 +21,40 @@ log "Installed basic packages"
 # Get and load credentials with proper permissions
 log "Reading credentials from S3"
 mkdir -p /root/.aws
-aws s3 cp s3://iykonect-aws-parallel/credentials.sh /root/credentials.sh || {
-    log "ERROR: Failed to fetch credentials.sh from S3"
+
+# Add retry mechanism for S3 download
+max_attempts=5
+attempt=1
+while [ $attempt -le $max_attempts ]; do
+    log "Attempt $attempt to download credentials file..."
+    
+    # Verify S3 bucket exists
+    if ! aws s3 ls s3://iykonect-aws-parallel/; then
+        log "ERROR: Cannot access S3 bucket, attempt $attempt"
+        sleep 10
+        attempt=$((attempt + 1))
+        continue
+    fi
+    
+    # Try to download file
+    if aws s3 cp s3://iykonect-aws-parallel/credentials.sh /root/credentials.sh; then
+        log "Successfully downloaded credentials file"
+        break
+    fi
+    
+    log "Failed to download credentials file, attempt $attempt"
+    [ $attempt -lt $max_attempts ] && sleep 10
+    attempt=$((attempt + 1))
+done
+
+if [ $attempt -gt $max_attempts ]; then
+    log "ERROR: Failed to download credentials after $max_attempts attempts"
     exit 1
-}
+fi
+
 chmod 600 /root/credentials.sh
+cat /root/credentials.sh >> /var/log/user-data.log
 . /root/credentials.sh
-#rm /root/credentials.sh
 
 # Verify credentials loaded
 if [ -z "$AWS_REGION" ]; then
