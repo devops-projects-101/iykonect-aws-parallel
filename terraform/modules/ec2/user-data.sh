@@ -17,14 +17,43 @@ log "Installed required packages"
 # Setup EFS
 mount_point="/iykonect-data"
 log "Setting up EFS at $mount_point"
-sudo mkdir -p $mount_point
 
-# Mount EFS
-if sudo mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport "${efs_dns_name}:/" $mount_point; then
-    echo "${efs_dns_name}:/ $mount_point nfs4 nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,_netdev 0 0" | sudo tee -a /etc/fstab
-    log "EFS mounted successfully"
-else
-    log "ERROR: Failed to mount EFS"
+# Mount EFS with retries
+mount_efs() {
+    local max_attempts=5
+    local attempt=1
+    local mount_options="nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport"
+    
+    while [ $attempt -le $max_attempts ]; do
+        log "Attempting to mount EFS (Attempt $attempt/$max_attempts)"
+        
+        # Test EFS endpoint
+        if ! nc -zv ${efs_dns_name} 2049 >/dev/null 2>&1; then
+            log "WARNING: EFS endpoint not reachable, waiting..."
+            sleep 10
+            attempt=$((attempt + 1))
+            continue
+        fi
+        
+        # Try mounting
+        if sudo mount -t nfs4 -o $mount_options "${efs_dns_name}:/" $mount_point; then
+            log "EFS mounted successfully"
+            echo "${efs_dns_name}:/ $mount_point nfs4 $mount_options,_netdev 0 0" | sudo tee -a /etc/fstab
+            return 0
+        fi
+        
+        log "Mount attempt $attempt failed, retrying..."
+        attempt=$((attempt + 1))
+        sleep 5
+    done
+    
+    log "ERROR: Failed to mount EFS after $max_attempts attempts"
+    return 1
+}
+
+# Create mount point and attempt mount
+sudo mkdir -p $mount_point
+if ! mount_efs; then
     exit 1
 fi
 
