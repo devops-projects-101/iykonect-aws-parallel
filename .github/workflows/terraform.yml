@@ -7,11 +7,24 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
-      destroy:
-        description: 'Destroy infrastructure'
-        type: boolean
+      action:
+        description: 'Action to perform'
+        type: choice
         required: true
-        default: false
+        default: 'plan'
+        options:
+          - plan
+          - apply
+          - destroy
+      environment:
+        description: 'Environment to target'
+        type: choice
+        required: true
+        default: 'development'
+        options:
+          - development
+          - staging
+          - production
 
 permissions:
   contents: read
@@ -101,7 +114,9 @@ jobs:
           })
 
     - name: Terraform Apply
-      if: github.ref == 'refs/heads/main' && github.event_name == 'push' && !inputs.destroy
+      if: |
+        (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
       env:
         TF_VAR_docker_username: ${{ secrets.DOCKER_USERNAME }}
         TF_VAR_docker_password: ${{ secrets.DOCKER_PASSWORD }}
@@ -111,7 +126,7 @@ jobs:
       run: terraform apply -auto-approve -input=false
 
     - name: Terraform Destroy
-      if: inputs.destroy == true && github.event_name == 'workflow_dispatch'
+      if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
       env:
         TF_VAR_docker_username: ${{ secrets.DOCKER_USERNAME }}
         TF_VAR_docker_password: ${{ secrets.DOCKER_PASSWORD }}
