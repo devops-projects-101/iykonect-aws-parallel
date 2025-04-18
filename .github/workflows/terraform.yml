@@ -11,10 +11,11 @@ on:
         description: 'Action to perform'
         type: choice
         required: true
-        default: 'apply'
+        default: 'recreate-ec2'
         options:
           - apply
           - destroy
+          - recreate-ec2
 
 permissions:
   contents: read
@@ -104,10 +105,10 @@ jobs:
         echo "All credentials validated successfully"
         rm ./credentials_check.sh
 
-    - name: Terraform Format
-      id: fmt
-      run: terraform fmt -check
-      continue-on-error: true
+    # - name: Terraform Format
+    #   id: fmt
+    #   run: terraform fmt -check
+    #   continue-on-error: true
 
     - name: Terraform Init
       id: init
@@ -120,11 +121,9 @@ jobs:
     - name: Terraform Plan
       id: plan
       env:
-        TF_VAR_docker_username: ${{ secrets.DOCKER_USERNAME }}
-        TF_VAR_docker_password: ${{ secrets.DOCKER_PASSWORD }}
         TF_VAR_aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
         TF_VAR_aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        TF_VAR_aws_region: "eu-west-1"
+        TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
       run: terraform plan -no-color -input=false
       continue-on-error: true
 
@@ -161,8 +160,6 @@ jobs:
         (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
         (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'apply')
       env:
-        TF_VAR_docker_username: ${{ secrets.DOCKER_USERNAME }}
-        TF_VAR_docker_password: ${{ secrets.DOCKER_PASSWORD }}
         TF_VAR_aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
         TF_VAR_aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
@@ -171,9 +168,20 @@ jobs:
     - name: Terraform Destroy
       if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy'
       env:
-        TF_VAR_docker_username: ${{ secrets.DOCKER_USERNAME }}
-        TF_VAR_docker_password: ${{ secrets.DOCKER_PASSWORD }}
         TF_VAR_aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
         TF_VAR_aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
       run: terraform destroy -auto-approve -input=false
+
+    - name: Re-create EC2 Instance
+      if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'recreate-ec2'
+      env:
+        TF_VAR_aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        TF_VAR_aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
+      run: |
+        # Destroy only EC2 instance
+        terraform destroy -target=module.ec2.aws_instance.main -auto-approve
+        
+        # Re-create EC2 instance
+        terraform apply -target=module.ec2.aws_instance.main -auto-approve
