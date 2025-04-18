@@ -41,6 +41,16 @@ jobs:
         aws-region: eu-west-1
         audience: sts.amazonaws.com
 
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v2
+      with:
+        terraform_version: '1.6.6'
+
+    - name: Create S3 bucket for Terraform state
+      run: |
+        aws s3api head-bucket --bucket iykonect-aws-parallel 2>/dev/null || \
+        aws s3api create-bucket --bucket iykonect-aws-parallel --region us-east-1
+
     - name: Create and upload credentials file
       run: |
         cat > credentials.sh << EOF
@@ -53,15 +63,40 @@ jobs:
         aws s3 cp credentials.sh s3://iykonect-aws-parallel/credentials.sh
         rm credentials.sh
 
-    - name: Setup Terraform
-      uses: hashicorp/setup-terraform@v2
-      with:
-        terraform_version: '1.6.6'
-
-    - name: Create S3 bucket for Terraform state
+    - name: Validate credentials file in S3
       run: |
-        aws s3api head-bucket --bucket iykonect-aws-parallel 2>/dev/null || \
-        aws s3api create-bucket --bucket iykonect-aws-parallel --region us-east-1
+        echo "Downloading credentials file for validation..."
+        aws s3 cp s3://iykonect-aws-parallel/credentials.sh ./credentials_check.sh
+        
+        # Check file exists
+        if [ ! -f "./credentials_check.sh" ]; then
+          echo "ERROR: Failed to download credentials.sh"
+          exit 1
+        fi
+        
+        # Validate AWS_ACCESS_KEY_ID
+        if ! grep -q "AWS_ACCESS_KEY_ID='" ./credentials_check.sh || grep -q "AWS_ACCESS_KEY_ID=''" ./credentials_check.sh; then
+          echo "ERROR: AWS_ACCESS_KEY_ID is missing or empty"
+          rm ./credentials_check.sh
+          exit 1
+        fi
+        
+        # Validate AWS_SECRET_ACCESS_KEY
+        if ! grep -q "AWS_SECRET_ACCESS_KEY='" ./credentials_check.sh || grep -q "AWS_SECRET_ACCESS_KEY=''" ./credentials_check.sh; then
+          echo "ERROR: AWS_SECRET_ACCESS_KEY is missing or empty"
+          rm ./credentials_check.sh
+          exit 1
+        fi
+        
+        # Validate AWS_REGION and AWS_DEFAULT_REGION
+        if ! grep -q "AWS_REGION='eu-west-1'" ./credentials_check.sh || ! grep -q "AWS_DEFAULT_REGION='eu-west-1'" ./credentials_check.sh; then
+          echo "ERROR: AWS region settings are incorrect"
+          rm ./credentials_check.sh
+          exit 1
+        fi
+        
+        echo "All credentials validated successfully"
+        rm ./credentials_check.sh
 
     - name: Terraform Format
       id: fmt
