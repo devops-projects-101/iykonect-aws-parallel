@@ -16,10 +16,10 @@ log() {
 
 
 # # Configure AWS credentials directly
-# export AWS_ACCESS_KEY_ID='${AWS_ACCESS_KEY_ID}'
-# export AWS_SECRET_ACCESS_KEY='${AWS_SECRET_ACCESS_KEY}'
-# export AWS_REGION='${AWS_REGION}'
-# export AWS_DEFAULT_REGION='${AWS_REGION}'
+export AWS_ACCESS_KEY_ID='${AWS_ACCESS_KEY_ID}'
+export AWS_SECRET_ACCESS_KEY='${AWS_SECRET_ACCESS_KEY}'
+export AWS_REGION='${AWS_REGION}'
+export AWS_DEFAULT_REGION='${AWS_REGION}'
 
 
 # Initial setup
@@ -31,18 +31,18 @@ log "Installed basic packages"
 
 
 # # Configure AWS CLI
-# mkdir -p ~/.aws
-# cat > ~/.aws/credentials << EOF
-# [default]
-# aws_access_key_id = ${AWS_ACCESS_KEY_ID}
-# aws_secret_access_key = ${AWS_SECRET_ACCESS_KEY}
-# EOF
+mkdir -p ~/.aws
+cat > ~/.aws/credentials << EOF
+[default]
+aws_access_key_id = ${AWS_ACCESS_KEY_ID}
+aws_secret_access_key = ${AWS_SECRET_ACCESS_KEY}
+EOF
 
-# cat > ~/.aws/config << EOF
-# [default]
-# region = ${AWS_REGION}
-# output = json
-# EOF
+cat > ~/.aws/config << EOF
+[default]
+region = ${AWS_REGION}
+output = json
+EOF
 
 
 log "AWS credentials configured with region: ${AWS_REGION}"

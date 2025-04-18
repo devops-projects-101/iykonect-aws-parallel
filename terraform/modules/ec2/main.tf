@@ -173,10 +173,14 @@ resource "aws_instance" "main" {
   subnet_id     = var.subnet_id
 
   root_block_device {
-    volume_size = 60
-    volume_type = "gp3"
-    iops        = 3000
-    throughput  = 125
+    volume_size           = 60
+    volume_type           = "gp3"
+    iops                  = 3000
+    throughput            = 125
+    delete_on_termination = true
+    tags = {
+      Name = "${var.prefix}-root-volume"
+    }
   }
 
   vpc_security_group_ids = [aws_security_group.instance.id]
