@@ -47,6 +47,9 @@ while [ $attempt -le $max_attempts ]; do
     attempt=$((attempt + 1))
 done
 
+AWS_REGION='eu-west-1'
+
+
 if [ $attempt -gt $max_attempts ]; then
     log "ERROR: Failed to download credentials after $max_attempts attempts"
     exit 1
