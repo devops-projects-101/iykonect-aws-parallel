@@ -71,49 +71,54 @@ sudo mkdir -p $mount_point/{docker,data,logs}
 sudo chown -R root:root $mount_point/docker
 sudo systemctl restart docker
 
-# Configure AWS CLI
-log "Configuring AWS credentials"
+# Configure AWS CLI with proper validation
+configure_aws() {
+    log "Setting up AWS credentials"
+    
+    # Set AWS environment variables first
+    export AWS_DEFAULT_REGION=${aws_region}
+    export AWS_REGION=${aws_region}
+    export AWS_ACCESS_KEY_ID=${aws_access_key}
+    export AWS_SECRET_ACCESS_KEY=${aws_secret_key}
 
-# Validate AWS credentials are provided
-if [ -z "${aws_access_key}" ] || [ -z "${aws_secret_key}" ]; then
-    log "ERROR: AWS credentials not provided"
-    exit 1
-fi
+    # Create AWS config directory with proper permissions
+    mkdir -p /root/.aws
+    chmod 700 /root/.aws
 
-if [ -z "${aws_region}" ]; then
-    aws_region="eu-west-1"
-    log "WARNING: AWS region not set, using default: ${aws_region}"
-fi
-
-# Set AWS environment variables
-export AWS_DEFAULT_REGION=${aws_region}
-export AWS_REGION=${aws_region}
-export AWS_ACCESS_KEY_ID=${aws_access_key}
-export AWS_SECRET_ACCESS_KEY=${aws_secret_key}
-
-# Configure AWS CLI
-mkdir -p /root/.aws
-cat > /root/.aws/credentials << EOF
+    # Write credentials file
+    cat > /root/.aws/credentials << EOF
 [default]
 aws_access_key_id = ${aws_access_key}
 aws_secret_access_key = ${aws_secret_key}
 EOF
+    chmod 600 /root/.aws/credentials
 
-cat > /root/.aws/config << EOF
+    # Write config file
+    cat > /root/.aws/config << EOF
 [default]
 region = ${aws_region}
 output = json
 EOF
+    chmod 600 /root/.aws/config
 
-chmod 600 /root/.aws/{credentials,config}
+    # Verify credentials work
+    for i in {1..3}; do
+        log "Verifying AWS credentials (attempt $i/3)"
+        if aws sts get-caller-identity --region ${aws_region} >/dev/null 2>&1; then
+            log "AWS credentials verified successfully"
+            return 0
+        fi
+        sleep 5
+    done
 
-# Verify AWS configuration
-log "Verifying AWS credentials"
-if ! aws sts get-caller-identity > /dev/null 2>&1; then
-    log "ERROR: AWS credentials validation failed"
+    log "ERROR: Failed to validate AWS credentials after 3 attempts"
+    return 1
+}
+
+# Run AWS configuration
+if ! configure_aws; then
     exit 1
 fi
-log "AWS credentials validated successfully"
 
 # Login to ECR
 aws ecr get-login-password --region ${aws_region} | sudo docker login --username AWS --password-stdin 571664317480.dkr.ecr.${aws_region}.amazonaws.com
