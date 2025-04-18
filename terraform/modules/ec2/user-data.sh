@@ -27,114 +27,94 @@ log "Disk cleanup completed"
 df -h
 log "Current disk space usage shown above"
 
-sudo apt-get update
-sudo apt-get install -y docker.io awscli xfsprogs
-sudo systemctl start docker
-sudo systemctl enable docker
-log "Installed required packages"
 
-# Wait for EBS volume to be attached
-log "Waiting for EBS volume to be available..."
-while [ ! -e /dev/xvdf ]; do
-    log "EBS volume not yet attached, waiting 5 seconds..."
-    sleep 5
-done
-log "EBS volume detected at /dev/xvdf"
+##################################################################################################
 
-# Format and mount the EBS volume
-log "Preparing EBS volume for Docker data"
-if sudo file -s /dev/xvdf | grep -q "data"; then
-    log "Formatting EBS volume with XFS..."
-    sudo mkfs.xfs /dev/xvdf
-else
-    log "EBS volume already formatted"
-fi
 
-log "Creating mount point directory..."
-sudo mkdir -p /docker-data
+# Function to setup EBS volume for Docker
+setup_ebs_volume() {
+    local mount_point="/docker-data"
+    log "Starting EBS volume setup..."
 
-log "Mounting EBS volume..."
-if sudo mount /dev/xvdf /docker-data; then
-    log "EBS volume mounted successfully"
-else
-    log "ERROR: Failed to mount EBS volume"
-    exit 1
-fi
+    # Find EBS volume
+    local ebs_device=""
+    if [ -e "/dev/nvme1n1" ]; then
+        ebs_device="/dev/nvme1n1"
+        log "Found NVMe EBS volume at $ebs_device"
+    elif [ -e "/dev/xvdf" ]; then
+        ebs_device="/dev/xvdf"
+        log "Found xvdf EBS volume at $ebs_device"
+    else
+        log "ERROR: Could not find EBS volume"
+        return 1
+    fi
 
-# Add mount to fstab
-log "Adding mount to fstab for persistence"
-if grep -q "/docker-data" /etc/fstab; then
-    log "Fstab entry already exists"
-else
-    echo "/dev/xvdf /docker-data xfs defaults 0 0" | sudo tee -a /etc/fstab
-    log "Added fstab entry"
-fi
+    # Format if needed
+    if ! sudo file -s $ebs_device | grep -q "XFS"; then
+        log "Formatting EBS volume with XFS..."
+        if ! sudo mkfs.xfs -f $ebs_device; then
+            log "ERROR: Failed to format EBS volume"
+            return 1
+        fi
+        log "EBS volume formatted successfully"
+    else
+        log "EBS volume already formatted with XFS"
+    fi
 
-# Configure Docker to use the new volume
-log "Configuring Docker to use EBS volume"
-sudo mkdir -p /etc/docker
-cat << EOF | sudo tee /etc/docker/daemon.json
+    # Create mount point and mount volume
+    log "Creating mount point at $mount_point"
+    sudo mkdir -p $mount_point
+
+    log "Mounting EBS volume..."
+    if ! sudo mount $ebs_device $mount_point; then
+        log "ERROR: Failed to mount EBS volume"
+        return 1
+    fi
+    log "EBS volume mounted successfully at $mount_point"
+    df -h $mount_point
+
+    # Add to fstab
+    if ! grep -q "$mount_point" /etc/fstab; then
+        echo "$ebs_device $mount_point xfs defaults,nofail 0 2" | sudo tee -a /etc/fstab
+        log "Added fstab entry"
+    fi
+
+    # Setup Docker configuration
+    log "Configuring Docker to use EBS volume"
+    sudo mkdir -p /etc/docker
+    cat << EOF | sudo tee /etc/docker/daemon.json
 {
-    "data-root": "/docker-data",
+    "data-root": "$mount_point",
     "storage-driver": "overlay2"
 }
 EOF
+    
+    # Create Docker data directory
+    sudo mkdir -p $mount_point/docker
+    log "Docker data directory created on EBS volume"
 
-# Verify Docker data directory
-sudo mkdir -p /docker-data/docker
-log "Docker data directory created on EBS volume"
+    # Restart Docker service
+    log "Restarting Docker service..."
+    if ! sudo systemctl restart docker; then
+        log "ERROR: Failed to restart Docker service"
+        return 1
+    fi
 
-# Restart Docker to apply new configuration
-log "Restarting Docker service..."
-if sudo systemctl restart docker; then
-    log "Docker service restarted successfully"
-else
-    log "ERROR: Failed to restart Docker service"
-    exit 1
-fi
-
-# Verify Docker is running with new configuration
-if sudo docker info | grep "Docker Root Dir: /docker-data"; then
+    # Verify Docker is using EBS volume
+    if ! sudo docker info | grep -q "Docker Root Dir: $mount_point"; then
+        log "ERROR: Docker not using EBS volume"
+        return 1
+    fi
+    
     log "Docker successfully configured to use EBS volume"
-else
-    log "ERROR: Docker not using EBS volume"
-    exit 1
-fi
+    return 0
+}
 
-# Configure AWS CLI
-log "Configuring AWS CLI"
-mkdir -p /root/.aws
-cat > /root/.aws/credentials << EOF
-[default]
-aws_access_key_id = ${aws_access_key}
-aws_secret_access_key = ${aws_secret_key}
-EOF
 
-cat > /root/.aws/config << EOF
-[default]
-region = eu-west-1
-output = json
-EOF
 
-chmod 600 /root/.aws/credentials
-chmod 600 /root/.aws/config
-log "AWS CLI credentials configured"
 
-# Verify AWS CLI configuration
-if aws sts get-caller-identity > /dev/null 2>&1; then
-    log "AWS CLI configuration verified successfully"
-else
-    log "ERROR: AWS CLI configuration failed"
-    exit 1
-fi
+#######################################################################################
 
-# Configure AWS CLI and authenticate with ECR
-aws ecr get-login-password --region eu-west-1 | sudo docker login --username AWS --password-stdin 571664317480.dkr.ecr.eu-west-1.amazonaws.com
-
-# Create docker network
-sudo docker network create app-network
-
-# Function to check disk space
 check_disk_space() {
     USAGE=$(df / | awk 'NR==2 {print $5}' | sed 's/%//')
     log "Current disk usage: $USAGE%"
@@ -177,6 +157,70 @@ check_disk_space() {
     fi
     return 0
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+##########################################################################################
+
+
+# Install required packages
+sudo apt-get update
+sudo apt-get install -y docker.io awscli xfsprogs
+sudo systemctl start docker
+sudo systemctl enable docker
+log "Installed required packages"
+
+# Setup EBS volume for Docker
+if ! setup_ebs_volume; then
+    log "ERROR: Failed to setup EBS volume for Docker"
+    exit 1
+fi
+
+# Configure AWS CLI
+log "Configuring AWS CLI"
+mkdir -p /root/.aws
+cat > /root/.aws/credentials << EOF
+[default]
+aws_access_key_id = ${aws_access_key}
+aws_secret_access_key = ${aws_secret_key}
+EOF
+
+cat > /root/.aws/config << EOF
+[default]
+region = eu-west-1
+output = json
+EOF
+
+chmod 600 /root/.aws/credentials
+chmod 600 /root/.aws/config
+log "AWS CLI credentials configured"
+
+# Verify AWS CLI configuration
+if aws sts get-caller-identity > /dev/null 2>&1; then
+    log "AWS CLI configuration verified successfully"
+else
+    log "ERROR: AWS CLI configuration failed"
+    exit 1
+fi
+
+# Configure AWS CLI and authenticate with ECR
+aws ecr get-login-password --region eu-west-1 | sudo docker login --username AWS --password-stdin 571664317480.dkr.ecr.eu-west-1.amazonaws.com
+
+# Create docker network
+sudo docker network create app-network
+
+# Function to check disk space
 
 # Pull images from ECR with detailed error handling and disk space checks
 log "Starting to pull images from ECR"

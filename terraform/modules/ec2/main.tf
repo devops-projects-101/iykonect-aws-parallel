@@ -89,7 +89,7 @@ resource "aws_instance" "main" {
 
 resource "aws_ebs_volume" "docker_volume" {
   availability_zone = aws_instance.main.availability_zone
-  size             = 30
+  size             = 50
   type             = "gp3"
 
   tags = {
@@ -98,7 +98,7 @@ resource "aws_ebs_volume" "docker_volume" {
 }
 
 resource "aws_volume_attachment" "docker_volume_att" {
-  device_name = "/dev/xvdf"
+  device_name = "/dev/sdf"  # Will show up as /dev/nvme1n1 on nitro instances
   volume_id   = aws_ebs_volume.docker_volume.id
   instance_id = aws_instance.main.id
 }
