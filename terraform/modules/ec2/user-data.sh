@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Enable logging of both stdout and stderr
-exec 1> /var/log/user-data.log 2>&1
+# exec 1> /var/log/user-data.log 2>&1
 
 # Logging function
 log() {
