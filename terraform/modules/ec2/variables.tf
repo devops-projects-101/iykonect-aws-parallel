@@ -47,4 +47,6 @@ variable "aws_secret_key" {
 variable "aws_region" {
   description = "AWS Region for ECR"
   type        = string
+  default     = "eu-west-1"
 }
+
