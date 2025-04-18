@@ -9,17 +9,20 @@ log "START - user data execution"
 
 # Validate required AWS credentials
 validate_aws_inputs() {
-    declare -a missing_vars
-
-    [ -z "${aws_access_key}" ] && missing_vars[${#missing_vars[@]}]="aws_access_key"
-    [ -z "${aws_secret_key}" ] && missing_vars[${#missing_vars[@]}]="aws_secret_key"
-    [ -z "${aws_region}" ] && missing_vars[${#missing_vars[@]}]="aws_region"
+    missing=""
     
-    if [ ${#missing_vars[@]} -ne 0 ]; then
-        log "ERROR: Missing required AWS credentials:"
-        for var in "${missing_vars[@]}"; do
-            log "  - $var"
-        done
+    if [ -z "${aws_access_key}" ]; then
+        missing="$missing aws_access_key"
+    fi
+    if [ -z "${aws_secret_key}" ]; then
+        missing="$missing aws_secret_key"
+    fi
+    if [ -z "${aws_region}" ]; then
+        missing="$missing aws_region"
+    fi
+    
+    if [ ! -z "$missing" ]; then
+        log "ERROR: Missing required AWS credentials:$missing"
         return 1
     fi
     
