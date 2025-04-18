@@ -160,7 +160,7 @@ resource "aws_instance" "main" {
   subnet_id     = var.subnet_id
 
   root_block_device {
-    volume_size = 500
+    volume_size = 60
     volume_type = "gp3"
     iops        = 3000
     throughput  = 125

@@ -15,10 +15,25 @@ log "Installed basic packages"
 
 # Fetch and load credentials from S3
 log "Fetching credentials from S3"
-aws s3 cp s3://iykonect-aws-parallel/credentials.sh /root/credentials.sh
+aws s3 cp s3://iykonect-aws-parallel/credentials.sh /root/credentials.sh || {
+    log "ERROR: Failed to fetch credentials.sh from S3"
+    exit 1
+}
 chmod 600 /root/credentials.sh
+
+# Display file content for debugging (hide sensitive info)
+log "Credentials file content (partial):"
+grep "AWS_REGION" /root/credentials.sh | sed 's/=.*/=***/'
+
+# Source the credentials
 source /root/credentials.sh
-log "Credentials loaded successfully"
+
+# Verify AWS configuration
+if [ -z "$AWS_REGION" ]; then
+    log "ERROR: AWS_REGION not set after sourcing credentials"
+    exit 1
+fi
+log "Using AWS region: ${AWS_REGION}"
 
 # Install Docker
 sudo apt-get remove docker docker-engine docker.io containerd runc || true
@@ -55,51 +70,50 @@ log "Docker system cleaned"
 
 # Create docker network
 sudo docker network create app-network
+log "Docker network created"
 
-# Login to ECR using credentials from S3
-log "Authenticating with ECR"
-if ! aws ecr get-login-password --region ${AWS_REGION} | sudo docker login --username AWS --password-stdin 571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com; then
-    log "ERROR: Failed to authenticate with ECR"
-    exit 1
-fi
-log "Successfully authenticated with ECR"
+# Deploy all containers
+log "Starting container deployments"
 
-# Pull and run containers
-log "Starting to pull and run containers"
-for service in redis prometheus grafana api react-app; do
-    log "Deploying $service"
-    if ! sudo docker pull 571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:$service; then
-        log "ERROR: Failed to pull $service"
-        exit 1
-    fi
+# Redis
+log "Deploying Redis..."
+sudo docker run -d --network app-network --restart always --name redis_service -p 6379:6379 \
+    -e REDIS_PASSWORD=IYKONECTpassword \
+    571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:redis \
+    redis-server --requirepass IYKONECTpassword --bind 0.0.0.0
+log "Redis container status: $(sudo docker inspect -f '{{.State.Status}}' redis_service)"
 
-    case $service in
-        "redis")
-            cmd="sudo docker run -d --network app-network --restart always --name redis_service -p 6379:6379 -e REDIS_PASSWORD=IYKONECTpassword 571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:redis redis-server --requirepass IYKONECTpassword --bind 0.0.0.0"
-            ;;
-        "api")
-            cmd="sudo docker run -d --network app-network --restart always --name api -p 8000:80 571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:api"
-            ;;
-        "prometheus")
-            cmd="sudo docker run -d --network app-network --restart always --name prometheus -p 9090:9090 571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:prometheus"
-            ;;
-        "grafana")
-            cmd="sudo docker run -d --network app-network --restart always --name iykon-graphana-app -p 3100:3000 --user root 571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:grafana"
-            ;;
-    esac
+# API
+log "Deploying API..."
+sudo docker run -d --network app-network --restart always --name api -p 8000:80 \
+    571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:api
+log "API container status: $(sudo docker inspect -f '{{.State.Status}}' api)"
 
-    if [ ! -z "$cmd" ] && ! eval "$cmd"; then
-        log "ERROR: Failed to start $service"
-        exit 1
-    fi
-    log "$service deployed successfully"
-done
+# Prometheus
+log "Deploying Prometheus..."
+sudo docker run -d --network app-network --restart always --name prometheus -p 9090:9090 \
+    571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:prometheus
+log "Prometheus container status: $(sudo docker inspect -f '{{.State.Status}}' prometheus)"
 
-# Deploy Grafana Renderer
-log "Deploying Grafana Renderer"
-if ! sudo docker run -d --name renderer --network app-network -p 8081:8081 --restart always grafana/grafana-image-renderer:latest; then
-    log "ERROR: Failed to start Grafana Renderer"
-    exit 1
-fi
+# Grafana
+log "Deploying Grafana..."
+sudo docker run -d --network app-network --restart always --name iykon-graphana-app -p 3100:3000 \
+    --user root \
+    571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:grafana
+log "Grafana container status: $(sudo docker inspect -f '{{.State.Status}}' iykon-graphana-app)"
 
+# React App
+log "Deploying React App..."
+sudo docker run -d --network app-network --restart always --name react-app -p 3000:3000 \
+    571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:react-app
+log "React App container status: $(sudo docker inspect -f '{{.State.Status}}' react-app)"
+
+# Grafana Renderer
+log "Deploying Grafana Renderer..."
+sudo docker run -d --network app-network --restart always --name renderer -p 8081:8081 \
+    grafana/grafana-image-renderer:latest
+log "Renderer container status: $(sudo docker inspect -f '{{.State.Status}}' renderer)"
+
+log "All containers deployed. Final status:"
+sudo docker ps --format "{{.Names}}: {{.Status}}"
 log "END - user data execution"
