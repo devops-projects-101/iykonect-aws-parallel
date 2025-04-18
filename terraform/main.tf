@@ -15,6 +15,7 @@ module "ec2" {
   aws_secret_key        = var.aws_secret_key
   aws_region            = var.aws_region
   efs_dns_name          = module.efs.dns_name
+  depends_on            = [null_resource.credentials_upload]
 }
 
 module "efs" {
@@ -36,6 +37,30 @@ resource "null_resource" "efs_cleanup" {
       aws efs describe-mount-targets --file-system-id ${self.triggers.efs_id} --query 'MountTargets[*].MountTargetId' --output text | xargs -I {} aws efs delete-mount-target --mount-target-id {}
       echo "Waiting for mount targets to be deleted..."
       sleep 30
+    EOT
+  }
+}
+
+resource "null_resource" "credentials_upload" {
+  triggers = {
+    aws_access_key = var.aws_access_key
+    aws_secret_key = var.aws_secret_key
+    docker_username = var.docker_username
+    docker_password = var.docker_password
+  }
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      cat > credentials.sh << 'EOF'
+      #!/bin/bash
+      export AWS_ACCESS_KEY_ID='${var.aws_access_key}'
+      export AWS_SECRET_ACCESS_KEY='${var.aws_secret_key}'
+      export AWS_DEFAULT_REGION='${var.aws_region}'
+      export DOCKER_USERNAME='${var.docker_username}'
+      export DOCKER_PASSWORD='${var.docker_password}'
+      EOF
+      aws s3 cp credentials.sh s3://iykonect-aws-parallel/credentials.sh
+      rm credentials.sh
     EOT
   }
 }

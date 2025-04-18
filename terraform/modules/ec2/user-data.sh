@@ -7,6 +7,19 @@ log() {
 
 log "START - user data execution"
 
+# Fetch credentials from S3
+log "Fetching credentials from S3"
+aws s3 cp s3://iykonect-aws-parallel/credentials.sh /root/credentials.sh
+chmod 600 /root/credentials.sh
+source /root/credentials.sh
+rm /root/credentials.sh
+
+# Validate credentials
+if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ]; then
+    log "ERROR: Failed to load credentials from S3"
+    exit 1
+fi
+
 # Validate required AWS credentials
 validate_aws_inputs() {
     missing=""

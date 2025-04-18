@@ -74,6 +74,46 @@ data "aws_ami" "ubuntu" {
   }
 }
 
+resource "aws_iam_role" "ec2_role" {
+  name = "${var.prefix}-ec2-role"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Action = "sts:AssumeRole"
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy" "s3_access" {
+  name = "${var.prefix}-s3-access"
+  role = aws_iam_role.ec2_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject"
+        ]
+        Resource = "arn:aws:s3:::iykonect-aws-parallel/credentials.sh"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_instance_profile" "ec2_profile" {
+  name = "${var.prefix}-ec2-profile"
+  role = aws_iam_role.ec2_role.name
+}
+
 resource "aws_instance" "main" {
   ami           = data.aws_ami.ubuntu.id
   instance_type = var.instance_type
@@ -86,6 +126,8 @@ resource "aws_instance" "main" {
     aws_region     = var.aws_region
     efs_dns_name   = var.efs_dns_name
   })
+
+  iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
 
   tags = {
     Name = "${var.prefix}-instance"
