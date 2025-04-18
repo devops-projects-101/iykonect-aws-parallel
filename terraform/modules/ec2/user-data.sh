@@ -13,6 +13,27 @@ sudo apt-get update
 sudo apt-get install -y nfs-common awscli jq
 log "Installed basic packages"
 
+
+# Fetch credentials from S3
+log "Fetching credentials from S3"
+aws s3 cp s3://iykonect-aws-parallel/credentials.sh /root/credentials.sh
+chmod 600 /root/credentials.sh
+
+# Load credentials
+sh /root/credentials.sh
+log "Credentials loaded successfully"
+
+
+
+# Configure AWS CLI
+log "Configuring AWS CLI"
+aws configure set aws_access_key_id "${AWS_ACCESS_KEY_ID}"
+aws configure set aws_secret_access_key "${AWS_SECRET_ACCESS_KEY}"
+aws configure set region "${AWS_REGION}"
+aws configure set output "json"
+
+
+
 # Setup mount point for EFS first
 mount_point="/iykonect-data"
 sudo mkdir -p $mount_point
@@ -60,13 +81,15 @@ EOF
 sudo modprobe overlay
 sudo modprobe br_netfilter
 
-cat << EOF | sudo tee /etc/sysctl.d/docker.conf
+# Configure system settings
+cat << EOF | sudo tee -a /etc/sysctl.conf
 net.bridge.bridge-nf-call-iptables = 1
 net.bridge.bridge-nf-call-ip6tables = 1
 net.ipv4.ip_forward = 1
+fs.inotify.max_user_watches = 524288
 EOF
 
-sudo sysctl --system
+sudo sysctl -p
 
 # Setup Docker daemon with EFS storage
 sudo mkdir -p /etc/docker
@@ -100,21 +123,9 @@ log "Docker configured with EFS storage successfully"
 
 log "START - user data execution"
 
-# Fetch credentials from S3
-log "Fetching credentials from S3"
-aws s3 cp s3://iykonect-aws-parallel/credentials.sh /root/credentials.sh
-chmod 600 /root/credentials.sh
 
-# Load credentials
-sh /root/credentials.sh
-log "Credentials loaded successfully"
 
-# Configure AWS CLI
-log "Configuring AWS CLI"
-aws configure set aws_access_key_id "${AWS_ACCESS_KEY_ID}"
-aws configure set aws_secret_access_key "${AWS_SECRET_ACCESS_KEY}"
-aws configure set region "${AWS_REGION}"
-aws configure set output "json"
+
 
 # Verify AWS configuration
 if ! aws sts get-caller-identity > /dev/null 2>&1; then
@@ -136,6 +147,11 @@ log "Docker configured successfully"
 
 # Create docker network
 sudo docker network create app-network
+
+# Clean up Docker system
+log "Cleaning up Docker system"
+sudo docker system prune -af
+log "Docker system cleaned"
 
 # Login to ECR
 log "Authenticating with ECR"
