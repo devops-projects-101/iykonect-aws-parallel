@@ -159,33 +159,19 @@ resource "aws_instance" "main" {
   instance_type = var.instance_type
   subnet_id     = var.subnet_id
 
+  root_block_device {
+    volume_size = 500
+    volume_type = "gp3"
+    iops        = 3000
+    throughput  = 125
+  }
+
   vpc_security_group_ids = [aws_security_group.instance.id]
-  user_data = templatefile("${path.module}/user-data.sh", {
-    AWS_ACCESS_KEY_ID     = var.aws_access_key
-    AWS_SECRET_ACCESS_KEY = var.aws_secret_key
-    AWS_REGION            = var.aws_region
-    EFS_DNS_NAME          = var.efs_dns_name
-  })
+  user_data = templatefile("${path.module}/user-data.sh", {})
 
   iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
 
   tags = {
     Name = "${var.prefix}-instance"
   }
-}
-
-resource "aws_ebs_volume" "docker_volume" {
-  availability_zone = aws_instance.main.availability_zone
-  size             = 50
-  type             = "gp3"
-
-  tags = {
-    Name = "${var.prefix}-docker-volume"
-  }
-}
-
-resource "aws_volume_attachment" "docker_volume_att" {
-  device_name = "/dev/sdf"  # Will show up as /dev/nvme1n1 on nitro instances
-  volume_id   = aws_ebs_volume.docker_volume.id
-  instance_id = aws_instance.main.id
 }
