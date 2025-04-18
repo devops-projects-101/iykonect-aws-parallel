@@ -167,13 +167,15 @@ resource "aws_iam_instance_profile" "ec2_profile" {
   role = aws_iam_role.ec2_role.name
 }
 
-resource "aws_instance" "main" {
+resource "aws_spot_instance_request" "main" {
   ami           = data.aws_ami.ubuntu.id
   instance_type = var.instance_type
   subnet_id     = var.subnet_id
+  spot_price    = "0.03"  # Set your maximum spot price
+  wait_for_fulfillment = true
 
   root_block_device {
-    volume_size           = 60
+    volume_size           = 50
     volume_type           = "gp3"
     iops                  = 3000
     throughput            = 125
@@ -202,4 +204,20 @@ resource "aws_instance" "main" {
   lifecycle {
     create_before_destroy = true
   }
+}
+
+resource "aws_ec2_tag" "spot_instance_tags" {
+  resource_id = aws_spot_instance_request.main.spot_instance_id
+  key         = "Name"
+  value       = "${var.prefix}-spot-instance"
+
+  depends_on = [aws_spot_instance_request.main]
+}
+
+output "instance_id" {
+  value = aws_spot_instance_request.main.spot_instance_id
+}
+
+output "public_ip" {
+  value = aws_spot_instance_request.main.public_ip
 }
