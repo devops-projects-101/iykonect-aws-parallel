@@ -33,26 +33,73 @@ sudo systemctl start docker
 sudo systemctl enable docker
 log "Installed required packages"
 
+# Wait for EBS volume to be attached
+log "Waiting for EBS volume to be available..."
+while [ ! -e /dev/xvdf ]; do
+    log "EBS volume not yet attached, waiting 5 seconds..."
+    sleep 5
+done
+log "EBS volume detected at /dev/xvdf"
+
 # Format and mount the EBS volume
 log "Preparing EBS volume for Docker data"
-sudo mkfs.xfs /dev/xvdf
+if sudo file -s /dev/xvdf | grep -q "data"; then
+    log "Formatting EBS volume with XFS..."
+    sudo mkfs.xfs /dev/xvdf
+else
+    log "EBS volume already formatted"
+fi
+
+log "Creating mount point directory..."
 sudo mkdir -p /docker-data
-sudo mount /dev/xvdf /docker-data
+
+log "Mounting EBS volume..."
+if sudo mount /dev/xvdf /docker-data; then
+    log "EBS volume mounted successfully"
+else
+    log "ERROR: Failed to mount EBS volume"
+    exit 1
+fi
 
 # Add mount to fstab
-echo "/dev/xvdf /docker-data xfs defaults 0 0" | sudo tee -a /etc/fstab
+log "Adding mount to fstab for persistence"
+if grep -q "/docker-data" /etc/fstab; then
+    log "Fstab entry already exists"
+else
+    echo "/dev/xvdf /docker-data xfs defaults 0 0" | sudo tee -a /etc/fstab
+    log "Added fstab entry"
+fi
 
 # Configure Docker to use the new volume
+log "Configuring Docker to use EBS volume"
 sudo mkdir -p /etc/docker
 cat << EOF | sudo tee /etc/docker/daemon.json
 {
-    "data-root": "/docker-data"
+    "data-root": "/docker-data",
+    "storage-driver": "overlay2"
 }
 EOF
 
+# Verify Docker data directory
+sudo mkdir -p /docker-data/docker
+log "Docker data directory created on EBS volume"
+
 # Restart Docker to apply new configuration
-sudo systemctl restart docker
-log "Docker configured to use EBS volume"
+log "Restarting Docker service..."
+if sudo systemctl restart docker; then
+    log "Docker service restarted successfully"
+else
+    log "ERROR: Failed to restart Docker service"
+    exit 1
+fi
+
+# Verify Docker is running with new configuration
+if sudo docker info | grep "Docker Root Dir: /docker-data"; then
+    log "Docker successfully configured to use EBS volume"
+else
+    log "ERROR: Docker not using EBS volume"
+    exit 1
+fi
 
 # Configure AWS CLI
 log "Configuring AWS CLI"
