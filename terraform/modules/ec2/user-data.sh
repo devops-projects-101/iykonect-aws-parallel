@@ -13,26 +13,16 @@ sudo apt-get update
 sudo apt-get install -y awscli jq
 log "Installed basic packages"
 
-# Fetch and load credentials from S3
-log "Fetching credentials from S3"
+# Get and load credentials
+log "Reading credentials from S3"
 aws s3 cp s3://iykonect-aws-parallel/credentials.sh /root/credentials.sh || {
     log "ERROR: Failed to fetch credentials.sh from S3"
     exit 1
 }
 chmod 600 /root/credentials.sh
+. /root/credentials.sh
+rm /root/credentials.sh
 
-# Display file content for debugging (hide sensitive info)
-log "Credentials file content (partial):"
-grep "AWS_REGION" /root/credentials.sh | sed 's/=.*/=***/'
-
-# Source the credentials
-source /root/credentials.sh
-
-# Verify AWS configuration
-if [ -z "$AWS_REGION" ]; then
-    log "ERROR: AWS_REGION not set after sourcing credentials"
-    exit 1
-fi
 log "Using AWS region: ${AWS_REGION}"
 
 # Install Docker
@@ -71,6 +61,11 @@ log "Docker system cleaned"
 # Create docker network
 sudo docker network create app-network
 log "Docker network created"
+
+# Login to ECR
+log "Logging into ECR..."
+aws ecr get-login-password --region ${AWS_REGION} | sudo docker login --username AWS --password-stdin 571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com
+log "ECR login successful"
 
 # Deploy all containers
 log "Starting container deployments"
