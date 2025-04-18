@@ -1,5 +1,6 @@
 variable "prefix" {
-  type = string
+  type        = string
+  description = "Prefix for resource naming"
 }
 
 variable "vpc_id" {
@@ -48,5 +49,10 @@ variable "aws_region" {
   description = "AWS Region for ECR"
   type        = string
   default     = "eu-west-1"
+}
+
+variable "efs_dns_name" {
+  description = "DNS name of the EFS filesystem"
+  type        = string
 }
 

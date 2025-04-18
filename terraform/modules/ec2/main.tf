@@ -52,6 +52,13 @@ resource "aws_security_group" "instance" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
+  egress {
+    from_port   = 2049
+    to_port     = 2049
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
   tags = {
     Name = "${var.prefix}-sg"
   }
@@ -80,6 +87,7 @@ resource "aws_instance" "main" {
     aws_access_key       = var.aws_access_key
     aws_secret_key       = var.aws_secret_key
     aws_region           = var.aws_region
+    efs_dns_name         = var.efs_dns_name
   })
 
   tags = {

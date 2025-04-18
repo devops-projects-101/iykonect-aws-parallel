@@ -31,87 +31,58 @@ log "Current disk space usage shown above"
 ##################################################################################################
 
 
-# Function to setup EBS volume for Docker
-setup_ebs_volume() {
-    local mount_point="/docker-data"
-    log "Starting EBS volume setup..."
+# Function to setup EFS volume for Docker
+setup_efs() {
+    local mount_point="/iykonect-data"
+    log "Starting EFS setup..."
 
-    # Find EBS volume
-    local ebs_device=""
-    if [ -e "/dev/nvme1n1" ]; then
-        ebs_device="/dev/nvme1n1"
-        log "Found NVMe EBS volume at $ebs_device"
-    elif [ -e "/dev/xvdf" ]; then
-        ebs_device="/dev/xvdf"
-        log "Found xvdf EBS volume at $ebs_device"
-    else
-        log "ERROR: Could not find EBS volume"
-        return 1
-    fi
+    # Install EFS utilities
+    log "Installing EFS utilities..."
+    sudo apt-get install -y nfs-common
 
-    # Format if needed
-    if ! sudo file -s $ebs_device | grep -q "XFS"; then
-        log "Formatting EBS volume with XFS..."
-        if ! sudo mkfs.xfs -f $ebs_device; then
-            log "ERROR: Failed to format EBS volume"
-            return 1
-        fi
-        log "EBS volume formatted successfully"
-    else
-        log "EBS volume already formatted with XFS"
-    fi
-
-    # Create mount point and mount volume
+    # Create mount point
     log "Creating mount point at $mount_point"
     sudo mkdir -p $mount_point
 
-    log "Mounting EBS volume..."
-    if ! sudo mount $ebs_device $mount_point; then
-        log "ERROR: Failed to mount EBS volume"
+    # Get EFS DNS name from filesystem ID
+    EFS_DNS="${var.prefix}-efs.${var.aws_region}.amazonaws.com"
+
+    # Mount EFS filesystem
+    log "Mounting EFS filesystem at $EFS_DNS..."
+    if ! sudo mount -t nfs4 -o nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport ${EFS_DNS}:/ $mount_point; then
+        log "ERROR: Failed to mount EFS"
         return 1
     fi
-    log "EBS volume mounted successfully at $mount_point"
-    df -h $mount_point
 
     # Add to fstab
     if ! grep -q "$mount_point" /etc/fstab; then
-        echo "$ebs_device $mount_point xfs defaults,nofail 0 2" | sudo tee -a /etc/fstab
+        echo "${EFS_DNS}:/ $mount_point nfs4 nfsvers=4.1,rsize=1048576,wsize=1048576,hard,timeo=600,retrans=2,noresvport,_netdev 0 0" | sudo tee -a /etc/fstab
         log "Added fstab entry"
     fi
 
-    # Setup Docker configuration
-    log "Configuring Docker to use EBS volume"
+    # Configure Docker to use EFS
     sudo mkdir -p /etc/docker
     cat << EOF | sudo tee /etc/docker/daemon.json
 {
-    "data-root": "$mount_point",
+    "data-root": "$mount_point/docker",
     "storage-driver": "overlay2"
 }
 EOF
-    
-    # Create Docker data directory
-    sudo mkdir -p $mount_point/docker
-    log "Docker data directory created on EBS volume"
 
-    # Restart Docker service
+    # Create Docker directory structure
+    sudo mkdir -p $mount_point/{docker,data,logs}
+    sudo chown -R root:root $mount_point/docker
+
+    # Restart Docker
     log "Restarting Docker service..."
     if ! sudo systemctl restart docker; then
         log "ERROR: Failed to restart Docker service"
         return 1
     fi
 
-    # Verify Docker is using EBS volume
-    if ! sudo docker info | grep -q "Docker Root Dir: $mount_point"; then
-        log "ERROR: Docker not using EBS volume"
-        return 1
-    fi
-    
-    log "Docker successfully configured to use EBS volume"
+    log "EFS setup completed successfully"
     return 0
 }
-
-
-
 
 #######################################################################################
 
@@ -158,19 +129,6 @@ check_disk_space() {
     return 0
 }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
 ##########################################################################################
 
 
@@ -181,9 +139,9 @@ sudo systemctl start docker
 sudo systemctl enable docker
 log "Installed required packages"
 
-# Setup EBS volume for Docker
-if ! setup_ebs_volume; then
-    log "ERROR: Failed to setup EBS volume for Docker"
+# Setup EFS volume for Docker
+if ! setup_efs; then
+    log "ERROR: Failed to setup EFS volume for Docker"
     exit 1
 fi
 

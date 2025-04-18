@@ -14,4 +14,13 @@ module "ec2" {
   aws_access_key = var.aws_access_key
   aws_secret_key = var.aws_secret_key
   aws_region = var.aws_region
+  efs_dns_name = module.efs.dns_name
+}
+
+module "efs" {
+  source                  = "./modules/efs"
+  prefix                  = var.prefix
+  vpc_id                  = module.vpc.vpc_id
+  subnet_id               = module.vpc.public_subnet_id
+  allowed_security_groups = [module.ec2.security_group_id]
 }

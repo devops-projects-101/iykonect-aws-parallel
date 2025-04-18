@@ -25,3 +25,7 @@ output "sonarqube_endpoint" {
 output "renderer_endpoint" {
   value = "http://${aws_instance.main.public_ip}:8081"
 }
+
+output "security_group_id" {
+  value = aws_security_group.instance.id
+}
