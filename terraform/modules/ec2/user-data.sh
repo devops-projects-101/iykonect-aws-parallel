@@ -54,6 +54,10 @@ sudo systemctl start docker
 sudo systemctl enable docker
 log "Installed required packages"
 
+# Get region from instance metadata
+AWS_REGION=$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/document | jq -r .region)
+log "Running in AWS region: $AWS_REGION"
+
 # Setup EFS
 mount_point="/iykonect-data"
 log "Setting up EFS at $mount_point"
@@ -152,17 +156,14 @@ if ! configure_aws; then
     exit 1
 fi
 
-# Login to ECR
-aws ecr get-login-password --region "${aws_region}" | sudo docker login --username AWS --password-stdin 571664317480.dkr.ecr."${aws_region}".amazonaws.com
-
 # Create docker network
 sudo docker network create app-network
 
-# Pull images and run containers
+# Pull images and run containers (no explicit login needed with IAM role)
 log "Starting to pull images from ECR"
 for service in redis prometheus grafana api react-app; do
     log "Pulling image: $service"
-    if sudo docker pull 571664317480.dkr.ecr."${aws_region}".amazonaws.com/iykonect-images:"$service"; then
+    if sudo docker pull 571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:$service; then
         log "Successfully pulled $service"
     else
         log "ERROR: Failed to pull $service"
@@ -172,16 +173,16 @@ for service in redis prometheus grafana api react-app; do
     log "Starting $service container"
     case $service in
         "redis")
-            cmd="sudo docker run -d --network app-network --restart always --name redis_service -p 6379:6379 -e REDIS_PASSWORD=IYKONECTpassword 571664317480.dkr.ecr.${aws_region}.amazonaws.com/iykonect-images:redis redis-server --requirepass IYKONECTpassword --bind 0.0.0.0"
+            cmd="sudo docker run -d --network app-network --restart always --name redis_service -p 6379:6379 -e REDIS_PASSWORD=IYKONECTpassword 571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:redis redis-server --requirepass IYKONECTpassword --bind 0.0.0.0"
             ;;
         "api")
-            cmd="sudo docker run -d --network app-network --restart always --name api -p 8000:80 571664317480.dkr.ecr.${aws_region}.amazonaws.com/iykonect-images:api"
+            cmd="sudo docker run -d --network app-network --restart always --name api -p 8000:80 571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:api"
             ;;
         "prometheus")
-            cmd="sudo docker run -d --network app-network --restart always --name prometheus -p 9090:9090 571664317480.dkr.ecr.${aws_region}.amazonaws.com/iykonect-images:prometheus"
+            cmd="sudo docker run -d --network app-network --restart always --name prometheus -p 9090:9090 571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:prometheus"
             ;;
         "grafana")
-            cmd="sudo docker run -d --network app-network --restart always --name iykon-graphana-app -p 3100:3000 --user root 571664317480.dkr.ecr.${aws_region}.amazonaws.com/iykonect-images:grafana"
+            cmd="sudo docker run -d --network app-network --restart always --name iykon-graphana-app -p 3100:3000 --user root 571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:grafana"
             ;;
     esac
 

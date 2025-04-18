@@ -13,18 +13,9 @@ on:
         required: true
         default: 'plan'
         options:
-          - plan
           - apply
           - destroy
-      environment:
-        description: 'Environment to target'
-        type: choice
-        required: true
-        default: 'development'
-        options:
-          - development
-          - staging
-          - production
+
 
 permissions:
   contents: read
