@@ -18,25 +18,33 @@ apt-get update
 apt-get install -y awscli jq
 log "Installed basic packages"
 
-# Set AWS credentials and region
-export AWS_ACCESS_KEY_ID='${AWS_ACCESS_KEY_ID}'
-export AWS_SECRET_ACCESS_KEY='${AWS_SECRET_ACCESS_KEY}'
-export AWS_REGION='${AWS_REGION}'
-export AWS_DEFAULT_REGION='${AWS_REGION}'
-
 # Configure AWS CLI
 mkdir -p /root/.aws
+
+# Create AWS CLI config
+cat > /root/.aws/config << EOF
+[default]
+region=us-east-1
+output=json
+EOF
+
+# Create temporary credentials file
 cat > /root/.aws/credentials << EOF
 [default]
 aws_access_key_id=${AWS_ACCESS_KEY_ID}
 aws_secret_access_key=${AWS_SECRET_ACCESS_KEY}
 EOF
 
-cat > /root/.aws/config << EOF
-[default]
-region=${AWS_REGION}
-output=json
-EOF
+# Get and use credentials from S3
+aws s3 cp s3://iykonect-aws-parallel/credentials.sh /root/credentials.sh || {
+    log "ERROR: Failed to fetch credentials from S3"
+    exit 1
+}
+chmod 600 /root/credentials.sh
+source /root/credentials.sh
+
+# Clean up temporary credentials
+rm -f /root/.aws/credentials
 
 log "AWS credentials configured with region: ${AWS_REGION}"
 
