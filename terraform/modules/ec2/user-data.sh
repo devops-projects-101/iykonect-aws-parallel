@@ -9,7 +9,7 @@ set -x
 set -e
 
 #region Variables
-AWS_REGION=us-east-1
+AWS_REGION=eu-west-1
 
 
 # Logging function with proper permissions
