@@ -167,4 +167,4 @@ jobs:
                         -auto-approve
 
         # Re-create all resources
-        terraform apply -target=module.ec2 -auto-approve
+        terraform apply -auto-approve
