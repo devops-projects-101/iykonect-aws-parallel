@@ -158,8 +158,13 @@ jobs:
         TF_VAR_aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
       run: |
-        # Destroy only EC2 instance
-        terraform destroy -target=module.ec2.aws_instance.main -auto-approve
-        
-        # Re-create EC2 instance
-        terraform apply -target=module.ec2.aws_instance.main -auto-approve
+        # Destroy EC2 and related resources
+        terraform destroy -target=module.ec2.aws_instance.main \
+                        -target=module.ec2.aws_iam_role.ec2_role \
+                        -target=module.ec2.aws_iam_role_policy.s3_access \
+                        -target=module.ec2.aws_iam_role_policy.ecr_access \
+                        -target=module.ec2.aws_iam_instance_profile.ec2_profile \
+                        -auto-approve
+
+        # Re-create all resources
+        terraform apply -target=module.ec2 -auto-approve

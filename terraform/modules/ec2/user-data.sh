@@ -8,6 +8,10 @@ fi
 set -x
 set -e
 
+#region Variables
+AWS_REGION=us-east-1
+
+
 # Logging function with proper permissions
 log() {
     echo "[$(date)] $1" | sudo tee -a /var/log/user-data.log
@@ -18,35 +22,35 @@ apt-get update
 apt-get install -y awscli jq
 log "Installed basic packages"
 
-# Configure AWS CLI
-mkdir -p /root/.aws
+# # Configure AWS CLI
+# mkdir -p /root/.aws
 
-# Create AWS CLI config
-cat > /root/.aws/config << EOF
-[default]
-region=us-east-1
-output=json
-EOF
+# # Create AWS CLI config
+# cat > /root/.aws/config << EOF
+# [default]
+# region=us-east-1
+# output=json
+# EOF
 
-# Create temporary credentials file
-cat > /root/.aws/credentials << EOF
-[default]
-aws_access_key_id=${AWS_ACCESS_KEY_ID}
-aws_secret_access_key=${AWS_SECRET_ACCESS_KEY}
-EOF
+# # Create temporary credentials file
+# cat > /root/.aws/credentials << EOF
+# [default]
+# aws_access_key_id=${AWS_ACCESS_KEY_ID}
+# aws_secret_access_key=${AWS_SECRET_ACCESS_KEY}
+# EOF
 
-# Get and use credentials from S3
-aws s3 cp s3://iykonect-aws-parallel/credentials.sh /root/credentials.sh || {
-    log "ERROR: Failed to fetch credentials from S3"
-    exit 1
-}
-chmod 600 /root/credentials.sh
-source /root/credentials.sh
+# # Get and use credentials from S3
+# aws s3 cp s3://iykonect-aws-parallel/credentials.sh /root/credentials.sh || {
+#     log "ERROR: Failed to fetch credentials from S3"
+#     exit 1
+# }
+# chmod 600 /root/credentials.sh
+# source /root/credentials.sh
 
-# Clean up temporary credentials
-rm -f /root/.aws/credentials
+# # Clean up temporary credentials
+# rm -f /root/.aws/credentials
 
-log "AWS credentials configured with region: ${AWS_REGION}"
+# log "AWS credentials configured with region: ${AWS_REGION}"
 
 # Verify AWS Configuration
 log "Verifying AWS configuration..."
