@@ -150,8 +150,8 @@ log "Grafana container status: $(docker inspect -f '{{.State.Status}}' iykon-gra
 # React App
 log "Deploying React App..."
 docker run -d --network app-network --restart always --name react-app -p 3000:3000 \
-    571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:react-app
-log "React App container status: $(docker inspect -f '{{.State.Status}}' react-app)"
+    571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:react-standalone
+log "React App container status: $(docker inspect -f '{{.State.Status}}' react-standalone"
 
 # Grafana Renderer
 log "Deploying Grafana Renderer..."
