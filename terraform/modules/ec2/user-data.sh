@@ -52,6 +52,24 @@ log "Installed basic packages"
 
 # log "AWS credentials configured with region: ${AWS_REGION}"
 
+# Verify S3 access
+log "Verifying S3 bucket access..."
+if ! aws s3 ls s3://iykonect-aws-parallel/ > /dev/null 2>&1; then
+  log "ERROR: S3 bucket access verification failed"
+  exit 1
+fi
+log "S3 bucket access verified successfully"
+
+
+# Verify ECR access
+log "Verifying ECR permissions..."
+if ! aws ecr list-images --repository-name iykonect-images --region ${AWS_REGION} --output table > /dev/null 2>&1; then
+  log "ERROR: ECR access verification failed"
+  exit 1
+fi
+log "ECR permissions verified successfully"
+
+
 # Verify AWS Configuration
 log "Verifying AWS configuration..."
 if ! aws sts get-caller-identity > /dev/null 2>&1; then
@@ -97,9 +115,14 @@ log "Docker system cleaned"
 docker network create app-network
 log "Docker network created"
 
+
+
+
 # Login to ECR
 log "Logging into ECR..."
-aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin 571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com
+
+LOGIN_OUTPUT=$(aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin 571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com 2>&1)
+log "ECR login output: ${LOGIN_OUTPUT}"
 log "ECR login successful"
 
 # Deploy all containers
