@@ -17,40 +17,32 @@ log() {
     echo "[$(date)] $1" | sudo tee -a /var/log/user-data.log
 }
 
+
+
+# Setup user environment
+cat << 'EOF' >> /etc/profile.d/iykonect-welcome.sh
+# Auto switch to root
+if [ "$(id -u)" != "0" ]; then
+    sudo su -
+fi
+
+# Show system status on login
+alias status='clear; echo "Container Status:"; docker ps; echo -e "\nECR Images:"; aws ecr list-images --repository-name iykonect-images --region eu-west-1 --output table; echo -e "\nS3 Contents:"; aws s3 ls s3://iykonect-aws-parallel/; echo -e "\nRecent Logs:"; tail -f /var/log/user-data.log'
+
+# Execute status check on login
+status
+EOF
+
+chmod +x /etc/profile.d/iykonect-welcome.sh
+log "User environment configured"
+
+
+
 # Initial setup
 apt-get update
 apt-get install -y awscli jq
 log "Installed basic packages"
 
-# # Configure AWS CLI
-# mkdir -p /root/.aws
-
-# # Create AWS CLI config
-# cat > /root/.aws/config << EOF
-# [default]
-# region=us-east-1
-# output=json
-# EOF
-
-# # Create temporary credentials file
-# cat > /root/.aws/credentials << EOF
-# [default]
-# aws_access_key_id=${AWS_ACCESS_KEY_ID}
-# aws_secret_access_key=${AWS_SECRET_ACCESS_KEY}
-# EOF
-
-# # Get and use credentials from S3
-# aws s3 cp s3://iykonect-aws-parallel/credentials.sh /root/credentials.sh || {
-#     log "ERROR: Failed to fetch credentials from S3"
-#     exit 1
-# }
-# chmod 600 /root/credentials.sh
-# source /root/credentials.sh
-
-# # Clean up temporary credentials
-# rm -f /root/.aws/credentials
-
-# log "AWS credentials configured with region: ${AWS_REGION}"
 
 # Verify S3 access
 log "Verifying S3 bucket access..."
@@ -168,5 +160,6 @@ docker run -d --network app-network --restart always --name renderer -p 8081:808
 log "Renderer container status: $(docker inspect -f '{{.State.Status}}' renderer)"
 
 log "All containers deployed. Final status:"
-docker ps --format "{{.Names}}: {{.Status}}"
+docker ps --format "{{.Names}}: {{.Status}}" | while read line; do log "$line"; done
+
 log "END - user data execution"
