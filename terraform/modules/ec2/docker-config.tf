@@ -10,7 +10,7 @@ locals {
     }
     api = {
       image = "${local.ecr_registry}/iykonect-images:api"
-      ports = ["8080:80"]  # Updated to match docker-compose
+      ports = ["8080:80"]
     }
     prometheus = {
       image = "${local.ecr_registry}/iykonect-images:prometheus"
@@ -18,8 +18,12 @@ locals {
     }
     grafana = {
       image = "${local.ecr_registry}/iykonect-images:grafana"
-      ports = ["3000:3000"]  # Updated to match docker-compose
+      ports = ["3000:3000"]
       user  = "root"
+    }
+    react = {
+      image = "${local.ecr_registry}/iykonect-images:react"
+      ports = ["3000:3000"]
     }
     sonarqube = {
       image = "sonarqube:community"
