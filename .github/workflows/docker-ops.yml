@@ -7,17 +7,18 @@ on:
         description: 'Branch to use'
         required: true
         type: string
+        default: ${{ github.ref_name }}
 
 permissions:
   contents: read
 
 jobs:
-  recreate-containers:
+  container-ops:
     name: 'Recreate All Containers'
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout
+    - name: Checkout specific branch
       uses: actions/checkout@v3
       with:
         ref: ${{ github.event.inputs.branch }}
@@ -84,12 +85,12 @@ jobs:
         fi
         echo "SSM agent is connected"
 
-    - name: Recreate All Containers Using Branch Images
+    - name: Recreate All Containers
       env:
         INSTANCE_ID: ${{ steps.get-instance.outputs.instance_id }}
-        BRANCH: ${{ github.event.inputs.branch }}
       run: |
-        # Send recreate command through SSM
+        echo "🔄 Starting recreation of ALL containers using branch: ${{ github.event.inputs.branch }}"
+        
         aws ssm send-command \
           --instance-ids "$INSTANCE_ID" \
           --document-name "AWS-RunShellScript" \
@@ -98,7 +99,7 @@ jobs:
             'source /etc/docker-config.env',
             
             'ssm_log \"=== Starting Recreation of All Containers ====\"',
-            'ssm_log \"Using branch: $BRANCH\"',
+            'ssm_log \"Using branch: ${{ github.event.inputs.branch }}\"',
             
             'ssm_log \"Refreshing ECR login...\"',
             'aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin $DOCKER_REGISTRY',
