@@ -44,6 +44,7 @@ resource "aws_instance" "main" {
     renderer_image    = local.docker_images.renderer.image
     renderer_port     = local.docker_images.renderer.ports[0]
     AWS_REGION        = data.aws_region.current.name
+    LOGIN_OUTPUT      = ""
   })
   iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
 
