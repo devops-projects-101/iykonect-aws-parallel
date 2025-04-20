@@ -1,7 +1,10 @@
 name: 'Recreate All Containers'
 
+
 on:
-  workflow_dispatch:
+  push:
+    branches:
+      - '**'  # This will match all branches
 
 permissions:
   contents: read
