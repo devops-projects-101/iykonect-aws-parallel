@@ -1,10 +1,12 @@
-name: 'Recreate All Containers'
-
+name: 'Container Management'
 
 on:
-  push:
-    branches:
-      - '**'  # This will match all branches
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: 'Branch to use'
+        required: true
+        type: string
 
 permissions:
   contents: read
@@ -18,7 +20,8 @@ jobs:
     - name: Checkout
       uses: actions/checkout@v3
       with:
-        ref: ${{ github.ref }}
+        ref: ${{ github.event.inputs.branch }}
+        fetch-depth: 0
 
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v2
@@ -31,13 +34,60 @@ jobs:
     - name: Get EC2 Instance ID
       id: get-instance
       run: |
-        aws s3 cp s3://iykonect-aws-parallel/terraform.tfstate /tmp/terraform.tfstate
+        # Download and verify terraform state
+        if ! aws s3 cp s3://iykonect-aws-parallel/terraform.tfstate /tmp/terraform.tfstate; then
+          echo "Error: Failed to download terraform state file"
+          exit 1
+        fi
+
+        # Check if file exists and is not empty
+        if [ ! -s /tmp/terraform.tfstate ]; then
+          echo "Error: Terraform state file is empty or does not exist"
+          exit 1
+        fi
+
+        # Extract and validate instance ID
         INSTANCE_ID=$(cat /tmp/terraform.tfstate | jq -r '.outputs.instance_id.value')
+        
+        if [ "$INSTANCE_ID" = "null" ] || [ -z "$INSTANCE_ID" ]; then
+          echo "Error: Could not find instance ID in terraform state"
+          echo "State file content:"
+          cat /tmp/terraform.tfstate
+          exit 1
+        fi
+
+        if [[ ! "$INSTANCE_ID" =~ ^i-[a-zA-Z0-9]{8,17}$ ]]; then
+          echo "Error: Invalid instance ID format: $INSTANCE_ID"
+          exit 1
+        fi
+
+        echo "Found Instance ID: $INSTANCE_ID"
         echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
 
-    - name: Recreate All Containers
+    - name: Verify EC2 Instance
       env:
         INSTANCE_ID: ${{ steps.get-instance.outputs.instance_id }}
+      run: |
+        # Verify instance exists and is running
+        STATUS=$(aws ec2 describe-instances --instance-ids $INSTANCE_ID --query 'Reservations[0].Instances[0].State.Name' --output text || echo "error")
+        if [ "$STATUS" != "running" ]; then
+          echo "Error: Instance $INSTANCE_ID is not running (status: $STATUS)"
+          exit 1
+        fi
+        echo "Instance is running"
+
+        # Verify SSM agent is connected
+        PING_STATUS=$(aws ssm describe-instance-information --filters "Key=InstanceIds,Values=$INSTANCE_ID" --query 'InstanceInformationList[0].PingStatus' --output text || echo "error")
+        if [ "$PING_STATUS" != "Online" ]; then
+          echo "Error: SSM agent is not connected on instance $INSTANCE_ID (status: $PING_STATUS)"
+          exit 1
+        fi
+        echo "SSM agent is connected"
+
+    - name: Recreate All Containers Using Branch Images
+      env:
+        INSTANCE_ID: ${{ steps.get-instance.outputs.instance_id }}
+        BRANCH: ${{ github.event.inputs.branch }}
       run: |
         # Send recreate command through SSM
         aws ssm send-command \
@@ -48,6 +98,7 @@ jobs:
             'source /etc/docker-config.env',
             
             'ssm_log \"=== Starting Recreation of All Containers ====\"',
+            'ssm_log \"Using branch: $BRANCH\"',
             
             'ssm_log \"Refreshing ECR login...\"',
             'aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin $DOCKER_REGISTRY',
