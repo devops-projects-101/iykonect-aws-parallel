@@ -37,11 +37,33 @@ fi
 alias status='
 clear
 echo "╔════════════════════════════════════════════════════════════════╗"
-echo "║                     SYSTEM STATUS BOARD                         ║"
+echo "║                     SYSTEM STATUS BOARD                        ║"
 echo "╠════════════════════════════════════════════════════════════════╣"
 
+# Terraform Outputs
+echo "║ Terraform Status:                                              ║"
+if aws s3 cp s3://iykonect-aws-parallel/terraform.tfstate /tmp/terraform.tfstate > /dev/null 2>&1; then
+    echo "║ Infrastructure Endpoints:                                      ║"
+    INSTANCE_IP=$(cat /tmp/terraform.tfstate | jq -r ".outputs.instance_public_ip.value")
+    API_ENDPOINT=$(cat /tmp/terraform.tfstate | jq -r ".outputs.api_endpoint.value")
+    PROMETHEUS_ENDPOINT=$(cat /tmp/terraform.tfstate | jq -r ".outputs.prometheus_endpoint.value")
+    GRAFANA_ENDPOINT=$(cat /tmp/terraform.tfstate | jq -r ".outputs.grafana_endpoint.value")
+    SONARQUBE_ENDPOINT=$(cat /tmp/terraform.tfstate | jq -r ".outputs.sonarqube_endpoint.value")
+    RENDERER_ENDPOINT=$(cat /tmp/terraform.tfstate | jq -r ".outputs.renderer_endpoint.value")
+    
+    echo "║ Instance IP:        $INSTANCE_IP"
+    echo "║ API:               $API_ENDPOINT"
+    echo "║ Prometheus:        $PROMETHEUS_ENDPOINT"
+    echo "║ Grafana:           $GRAFANA_ENDPOINT"
+    echo "║ SonarQube:         $SONARQUBE_ENDPOINT"
+    echo "║ Renderer:          $RENDERER_ENDPOINT"
+else
+    echo -e "\e[91m║ ERROR: Could not fetch Terraform state!\e[0m                       ║"
+fi
+echo "╟────────────────────────────────────────────────────────────────╢"
+
 # ECR Images Check
-echo "║ ECR Images:                                                     ║"
+echo "║ ECR Images:                                                    ║"
 if aws ecr list-images --repository-name iykonect-images --region eu-west-1 --filter tagStatus=TAGGED --output table > /tmp/ecr_output 2>&1; then
     cat /tmp/ecr_output
 else
@@ -65,18 +87,18 @@ echo "╟───────────────────────�
 
 # Recent Logs with Container Status
 echo "║ Recent System and Container Status Logs:                       ║"
-echo "║ System Logs:                                                  ║"
+echo "║ System Logs:                                                   ║"
 tail -n 5 /var/log/user-data.log
-echo "║ Container Status:                                             ║"
+echo "║ Container Status:                                              ║"
 docker ps --format "{{.Names}}: {{.Status}}" > /tmp/container_status
 cat /tmp/container_status | while read line; do echo "║ $line"; done
 echo "╟────────────────────────────────────────────────────────────────╢"
 
 # Help Commands
-echo "║ Useful Commands:                                              ║"
-echo "║ - Use <status> to refresh this status board                   ║"
-echo "║ - tail -f /var/log/user-data.log to follow logs              ║"
-echo "║ - docker logs <container_name> -n 100 for container logs     ║"
+echo "║ Useful Commands:                                               ║"
+echo "║ - Use <status> to refresh this status board                    ║"
+echo "║ - tail -f /var/log/user-data.log to follow logs                ║"
+echo "║ - docker logs <container_name> -n 100 for container logs       ║"
 echo "╚════════════════════════════════════════════════════════════════╝"'
 
 # Execute status check on login

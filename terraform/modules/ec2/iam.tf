@@ -32,19 +32,18 @@ resource "aws_iam_role_policy" "s3_access" {
           "s3:ListBucketVersions",
           "s3:GetObjectVersion",
           "s3:HeadObject",
-          "s3:HeadBucket"
+          "s3:HeadBucket",
+          "s3:GetBucketPolicyStatus",
+          "s3:GetBucketPolicy",
+          "s3:PutObject",
+          "s3:PutObjectAcl",
+          "s3:DeleteObject",
+          "s3:ListAllMyBuckets"
         ]
         Resource = [
-          "*"
+          "arn:aws:s3:::*",
+          "arn:aws:s3:::*/*"
         ]
-      },
-      {
-        Effect = "Allow"
-        Action = [
-          "s3:ListAllMyBuckets",
-          "s3:GetBucketLocation"
-        ]
-        Resource = "*"
       }
     ]
   })
