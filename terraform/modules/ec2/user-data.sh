@@ -47,120 +47,70 @@ wait_for_container() {
     return 1
 }
 
-# Initial setup
+# Initial setup and packages
 log "Starting initial setup..."
 apt-get update
-apt-get install -y awscli jq apt-transport-https ca-certificates curl gnupg lsb-release
+apt-get install -y awscli jq apt-transport-https ca-certificates curl gnupg lsb-release htop
 log "Installed basic packages"
 
-# Setup user environment
-cat << 'EOF' >> /etc/profile.d/iykonect-welcome.sh
-# Auto switch to root
-if [ "$(id -u)" != "0" ]; then
-    sudo su -
-fi
-
-# Show system status on login
-alias status='
+# Setup status command
+cat << 'EOF' > /usr/local/bin/status
+#!/bin/bash
 clear
 echo "╔════════════════════════════════════════════════════════════════╗"
 echo "║                     SYSTEM STATUS BOARD                        ║"
-echo "╠════════════════════════════════════════════════════════════════╣"
+echo "╚════════════════════════════════════════════════════════════════╝"
 
-# System Logs Section
-echo "║ System Logs (Last 50 lines):                                  ║"
-echo "╟────────────────────────────────────────────────────────────────╢"
-tail -n 50 /var/log/user-data.log | while read -r line; do
-    echo "║ $line"
-done
-echo "╟────────────────────────────────────────────────────────────────╢"
+# System Info
+echo
+echo "📊 SYSTEM INFO"
+echo "──────────────"
+uptime
+echo
+echo "CPU Usage (top 5 processes):"
+ps -eo pcpu,pid,user,args | sort -k 1 -r | head -5
+echo
+echo "Memory Usage:"
+free -h
+echo
 
-# Container Logs Summary
-echo "║ Recent Container Logs:                                         ║"
-for container in redis_service api prometheus iykon-graphana-app react-app renderer; do
-    echo "║ --- $container Logs (Last 50 lines) ---"
-    docker logs $container --tail 50 2>/dev/null | while read -r line; do
-        echo "║ $line"
-    done
-    echo "║"
-done
-echo "╟────────────────────────────────────────────────────────────────╢"
-
-# Terraform Status
-echo "║ Terraform Status:                                              ║"
-if aws s3 cp s3://iykonect-aws-parallel/terraform.tfstate /tmp/terraform.tfstate > /dev/null 2>&1; then
-    echo "║ Infrastructure Endpoints:                                      ║"
-    INSTANCE_IP=$(cat /tmp/terraform.tfstate | jq -r ".outputs.instance_public_ip.value")
-    API_ENDPOINT=$(cat /tmp/terraform.tfstate | jq -r ".outputs.api_endpoint.value")
-    PROMETHEUS_ENDPOINT=$(cat /tmp/terraform.tfstate | jq -r ".outputs.prometheus_endpoint.value")
-    GRAFANA_ENDPOINT=$(cat /tmp/terraform.tfstate | jq -r ".outputs.grafana_endpoint.value")
-    SONARQUBE_ENDPOINT=$(cat /tmp/terraform.tfstate | jq -r ".outputs.sonarqube_endpoint.value")
-    RENDERER_ENDPOINT=$(cat /tmp/terraform.tfstate | jq -r ".outputs.renderer_endpoint.value")
-    
-    echo "║ Instance IP:        $INSTANCE_IP"
-    echo "║ API:               $API_ENDPOINT"
-    echo "║ Prometheus:        $PROMETHEUS_ENDPOINT"
-    echo "║ Grafana:           $GRAFANA_ENDPOINT"
-    echo "║ SonarQube:         $SONARQUBE_ENDPOINT"
-    echo "║ Renderer:          $RENDERER_ENDPOINT"
-else
-    echo -e "\e[91m║ ERROR: Could not fetch Terraform state!\e[0m                       ║"
-fi
-echo "╟────────────────────────────────────────────────────────────────╢"
-
-# ECR Images Check
-echo "║ ECR Images:                                                    ║"
-if aws ecr list-images --repository-name iykonect-images --region eu-west-1 --filter tagStatus=TAGGED --output table > /tmp/ecr_output 2>&1; then
-    cat /tmp/ecr_output
-else
-    echo -e "\e[91m║ ERROR: Failed to fetch ECR images!\e[0m                            ║"
-fi
-echo "╟────────────────────────────────────────────────────────────────╢"
-
-# S3 Bucket Check
-echo "║ S3 Contents:                                                   ║"
-if (aws s3 ls s3://iykonect-aws-parallel/ && aws s3 ls s3://iykons-s3-storage/) > /tmp/s3_output 2>&1; then
-    cat /tmp/s3_output
-else
-    echo -e "\e[91m║ ERROR: Failed to list S3 bucket contents!\e[0m                     ║"
-fi
-echo "╟────────────────────────────────────────────────────────────────╢"
-
-# Container Status with Details
-echo "║ Docker Container Status:                                       ║"
+# Container Status
+echo "🐳 DOCKER CONTAINERS"
+echo "──────────────────"
 docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
-echo "╟────────────────────────────────────────────────────────────────╢"
+echo
 
-# Recent Logs with Container Status
-echo "║ Recent System and Container Status Logs:                       ║"
-echo "║ System Logs:                                                   ║"
-tail -n 5 /var/log/user-data.log
-echo "║ Container Status:                                              ║"
-docker ps --format "{{.Names}}: {{.Status}}" > /tmp/container_status
-cat /tmp/container_status | while read line; do echo "║ $line"; done
-echo "╟────────────────────────────────────────────────────────────────╢"
+# Recent Logs
+echo "📝 RECENT SYSTEM LOGS"
+echo "──────────────────"
+tail -n 10 /var/log/user-data.log
+echo
 
-# Help Commands
-echo "║ Useful Commands:                                              ║"
-echo "║ Container Logs:                                               ║"
-echo "║ - docker logs redis_service -n 100     # Redis logs           ║"
-echo "║ - docker logs api -n 100              # API logs             ║"
-echo "║ - docker logs prometheus -n 100        # Prometheus logs      ║"
-echo "║ - docker logs iykon-graphana-app -n 100 # Grafana logs       ║"
-echo "║ - docker logs react-app -n 100         # React App logs      ║"
-echo "║ - docker logs renderer -n 100          # Renderer logs       ║"
-echo "║                                                              ║"
-echo "║ System Logs:                                                 ║"
-echo "║ - tail -n 50 -f /var/log/user-data.log # Follow system logs ║"
-echo "║ - status                               # Show this board     ║"
-echo "╚════════════════════════════════════════════════════════════════╝"'
+# Container Logs
+echo "📋 RECENT CONTAINER LOGS"
+echo "──────────────────"
+for container in redis_service api prometheus iykon-graphana-app react-app renderer; do
+    if docker ps -q -f name=$container >/dev/null 2>&1; then
+        echo "[$container]"
+        docker logs --tail 5 $container 2>&1
+        echo
+    fi
+done
 
-# Execute status check on login
-status
+# Help Section
+echo "ℹ️  AVAILABLE COMMANDS"
+echo "──────────────────"
+echo "status                    - Show this dashboard"
+echo "docker ps                 - List running containers"
+echo "docker logs CONTAINER     - View container logs"
+echo "tail -f /var/log/user-data.log   - Follow system logs"
+echo
 EOF
 
-chmod +x /etc/profile.d/iykonect-welcome.sh
-log "User environment configured"
+chmod +x /usr/local/bin/status
+
+# Add status command to profile
+echo "alias status='/usr/local/bin/status'" >> /etc/profile.d/iykonect-welcome.sh
 
 # Verify AWS Configuration first
 log "Verifying AWS configuration..."
