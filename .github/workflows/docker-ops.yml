@@ -1,32 +1,21 @@
-name: 'Docker Operations'
+name: 'Recreate All Containers'
 
 on:
-  push:
-    branches:
-      - '**'  # This will match all branches
   workflow_dispatch:
-    inputs:
-      action:
-        description: 'Action to perform'
-        type: choice
-        required: true
-        default: 'restart_containers'
-        options:
-          - restart_containers
-          - start_containers
-          - stop_containers
 
 permissions:
   contents: read
 
 jobs:
-  docker-ops:
-    name: 'Docker Operations'
+  recreate-containers:
+    name: 'Recreate All Containers'
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout
       uses: actions/checkout@v3
+      with:
+        ref: ${{ github.ref }}
 
     - name: Configure AWS Credentials
       uses: aws-actions/configure-aws-credentials@v2
@@ -39,40 +28,15 @@ jobs:
     - name: Get EC2 Instance ID
       id: get-instance
       run: |
-        # Get instance ID from terraform state in S3
         aws s3 cp s3://iykonect-aws-parallel/terraform.tfstate /tmp/terraform.tfstate
         INSTANCE_ID=$(cat /tmp/terraform.tfstate | jq -r '.outputs.instance_id.value')
         echo "instance_id=$INSTANCE_ID" >> $GITHUB_OUTPUT
 
-    - name: Restart Docker Containers
-      if: github.event.inputs.action == 'restart_containers'
+    - name: Recreate All Containers
       env:
         INSTANCE_ID: ${{ steps.get-instance.outputs.instance_id }}
       run: |
-        # Create wait_for_container function script
-        cat << 'EOF' > wait_for_container.sh
-        wait_for_container() {
-            local container=$1
-            local max_attempts=30
-            local attempt=1
-            
-            while [ $attempt -le $max_attempts ]; do
-                if [ "$(docker inspect -f '{{.State.Status}}' $container 2>/dev/null)" = "running" ]; then
-                    ssm_log "Container $container is running"
-                    return 0
-                fi
-                ssm_log "Waiting for container $container to be ready (attempt $attempt/$max_attempts)"
-                sleep 2
-                attempt=$((attempt + 1))
-            done
-            
-            ssm_log "ERROR: Container $container failed to start properly"
-            docker logs $container
-            return 1
-        }
-        EOF
-
-        # Send restart command through SSM
+        # Send recreate command through SSM
         aws ssm send-command \
           --instance-ids "$INSTANCE_ID" \
           --document-name "AWS-RunShellScript" \
@@ -80,102 +44,46 @@ jobs:
             'set -e',
             'source /etc/docker-config.env',
             
-            'ssm_log \"=== Starting Docker Container Restart Operation ====\"',
-            'ssm_log \"Stopping all containers...\"',
-            'docker stop $(docker ps -a -q) || true',
-            'docker rm $(docker ps -a -q) || true',
-            'ssm_log \"All containers stopped and removed\"',
+            'ssm_log \"=== Starting Recreation of All Containers ====\"',
             
             'ssm_log \"Refreshing ECR login...\"',
             'aws ecr get-login-password --region eu-west-1 | docker login --username AWS --password-stdin $DOCKER_REGISTRY',
-            'docker network create app-network || true',
             
-            '. ./wait_for_container.sh',
+            'ssm_log \"Stopping all containers...\"',
+            'docker stop redis_service api prometheus grafana-app react-app renderer || true',
+            'docker rm redis_service api prometheus grafana-app react-app renderer || true',
             
-            'ssm_log \"Starting Redis container...\"',
-            'if ! lsof -i:${REDIS_PORT%:*}; then',
-            '  docker run -d --network app-network --restart always --name redis_service -p $REDIS_PORT \\',
-            '      -e REDIS_PASSWORD=$REDIS_PASSWORD \\',
-            '      $REDIS_IMAGE \\',
-            '      redis-server --requirepass $REDIS_PASSWORD --bind 0.0.0.0',
-            '  wait_for_container redis_service || exit 1',
-            '  ssm_log \"Redis container status: $(docker inspect -f \"{{.State.Status}}\" redis_service)\"',
-            'else',
-            '  ssm_log \"ERROR: Port ${REDIS_PORT%:*} is not available for Redis\"',
-            '  exit 1',
-            'fi',
+            'ssm_log \"Removing old images...\"',
+            'docker system prune -f',
+            
+            'ssm_log \"Starting Redis...\"',
+            'docker run -d --network app-network --restart always --name redis_service -p $REDIS_PORT \
+              -e REDIS_PASSWORD=$REDIS_PASSWORD \
+              $REDIS_IMAGE \
+              redis-server --requirepass $REDIS_PASSWORD --bind 0.0.0.0',
+            
+            'ssm_log \"Starting API...\"',
+            'docker run -d --network app-network --restart always --name api -p $API_PORT $API_IMAGE',
+            
+            'ssm_log \"Starting Prometheus...\"',
+            'docker run -d --network app-network --restart always --name prometheus -p $PROMETHEUS_PORT $PROMETHEUS_IMAGE',
+            
+            'ssm_log \"Starting Grafana...\"',
+            'docker run -d --network app-network --restart always --name grafana-app -p $GRAFANA_PORT \
+              --user root \
+              $GRAFANA_IMAGE',
+            
+            'ssm_log \"Starting React...\"',
+            'docker run -d --network app-network --restart always --name react-app -p $REACT_PORT $REACT_IMAGE',
+            
+            'ssm_log \"Starting Renderer...\"',
+            'docker run -d --network app-network --restart always --name renderer -p $RENDERER_PORT $RENDERER_IMAGE',
             
             'sleep 10',
             
-            'ssm_log \"Starting API container...\"',
-            'if ! lsof -i:${API_PORT%:*}; then',
-            '  docker run -d --network app-network --restart always --name api -p $API_PORT \\',
-            '      $API_IMAGE',
-            '  wait_for_container api || exit 1',
-            '  ssm_log \"API container status: $(docker inspect -f \"{{.State.Status}}\" api)\"',
-            'else',
-            '  ssm_log \"ERROR: Port ${API_PORT%:*} is not available for API\"',
-            '  exit 1',
-            'fi',
+            'ssm_log \"=== Container Statuses ===\"',
+            'docker ps --format \"{{.Names}}: {{.Status}}\"',
             
-            'ssm_log \"Starting Prometheus container...\"',
-            'if ! lsof -i:${PROMETHEUS_PORT%:*}; then',
-            '  docker run -d --network app-network --restart always --name prometheus -p $PROMETHEUS_PORT \\',
-            '      $PROMETHEUS_IMAGE',
-            '  wait_for_container prometheus || exit 1',
-            '  ssm_log \"Prometheus container status: $(docker inspect -f \"{{.State.Status}}\" prometheus)\"',
-            'else',
-            '  ssm_log \"ERROR: Port ${PROMETHEUS_PORT%:*} is not available for Prometheus\"',
-            '  exit 1',
-            'fi',
-            
-            'ssm_log \"Starting Grafana container...\"',
-            'if ! lsof -i:${GRAFANA_PORT%:*}; then',
-            '  docker run -d --network app-network --restart always --name grafana-app -p $GRAFANA_PORT \\',
-            '      --user root \\',
-            '      $GRAFANA_IMAGE',
-            '  wait_for_container grafana-app || exit 1',
-            '  ssm_log \"Grafana container status: $(docker inspect -f \"{{.State.Status}}\" grafana-app)\"',
-            'else',
-            '  ssm_log \"ERROR: Port ${GRAFANA_PORT%:*} is not available for Grafana\"',
-            '  exit 1',
-            'fi',
-            
-            'ssm_log \"Starting React App container...\"',
-            'if ! lsof -i:${REACT_PORT%:*}; then',
-            '  docker run -d --network app-network --restart always --name react-app -p $REACT_PORT \\',
-            '      $REACT_IMAGE',
-            '  wait_for_container react-app || exit 1',
-            '  ssm_log \"React App container status: $(docker inspect -f \"{{.State.Status}}\" react-app)\"',
-            'else',
-            '  ssm_log \"ERROR: Port ${REACT_PORT%:*} is not available for React App\"',
-            '  exit 1',
-            'fi',
-            
-            'ssm_log \"Starting Renderer container...\"',
-            'if ! lsof -i:${RENDERER_PORT%:*}; then',
-            '  docker run -d --network app-network --restart always --name renderer -p $RENDERER_PORT \\',
-            '      $RENDERER_IMAGE',
-            '  wait_for_container renderer || exit 1',
-            '  ssm_log \"Renderer container status: $(docker inspect -f \"{{.State.Status}}\" renderer)\"',
-            'else',
-            '  ssm_log \"ERROR: Port ${RENDERER_PORT%:*} is not available for Renderer\"',
-            '  exit 1',
-            'fi',
-            
-            'ssm_log \"=== Final Deployment Status ===\"',
-            'ssm_log \"Network Status: $(docker network inspect app-network -f \"{{.Name}} is {{.Driver}}\")\"',
-            
-            'ssm_log \"Open Ports Summary:\"',
-            'netstat -tulpn | grep LISTEN | while read line; do ssm_log \"$line\"; done',
-            
-            'ssm_log \"Container Status Summary:\"',
-            'docker ps --format \"table {{.Names}}\t{{.Status}}\t{{.Ports}}\" | tee -a /var/log/ssm.log',
-            'docker ps --format \"{{.Names}}: {{.Status}}\" | while read line; do ssm_log \"$line\"; done',
-            
-            'ssm_log \"Resource Usage Summary:\"',
-            'docker stats --no-stream --format \"table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}\" | tee -a /var/log/ssm.log',
-            
-            'ssm_log \"=== Container Restart Operation Complete ====\"'
+            'ssm_log \"=== All Containers Recreation Complete ====\"'
           ]" \
           --output text
