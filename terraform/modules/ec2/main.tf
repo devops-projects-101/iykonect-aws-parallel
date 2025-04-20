@@ -1,3 +1,5 @@
+data "aws_region" "current" {}
+
 data "aws_ami" "ubuntu" {
   most_recent = true
   owners      = ["099720109477"]
@@ -41,6 +43,7 @@ resource "aws_instance" "main" {
     react_port        = local.docker_images.react.ports[0]
     renderer_image    = local.docker_images.renderer.image
     renderer_port     = local.docker_images.renderer.ports[0]
+    AWS_REGION        = data.aws_region.current.name
   })
   iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
 
