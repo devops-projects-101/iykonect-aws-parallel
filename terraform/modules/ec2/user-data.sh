@@ -12,6 +12,13 @@ set -e
 AWS_REGION=eu-west-1
 
 
+# Initial setup
+apt-get update
+apt-get install -y awscli jq
+log "Installed basic packages"
+
+
+
 # Logging function with proper permissions
 log() {
     echo "[$(date)] $1" | sudo tee -a /var/log/user-data.log
@@ -27,7 +34,50 @@ if [ "$(id -u)" != "0" ]; then
 fi
 
 # Show system status on login
-alias status='clear; echo "Container Status:"; docker ps; echo -e "\nECR Images:"; aws ecr list-images --repository-name iykonect-images --region eu-west-1 --output table; echo -e "\nS3 Contents:"; aws s3 ls s3://iykonect-aws-parallel/; echo -e "\nRecent Logs:"; tail -f /var/log/user-data.log'
+alias status='
+clear
+echo "╔════════════════════════════════════════════════════════════════╗"
+echo "║                     SYSTEM STATUS BOARD                         ║"
+echo "╠════════════════════════════════════════════════════════════════╣"
+
+# ECR Images Check
+echo "║ ECR Images:                                                     ║"
+if aws ecr list-images --repository-name iykonect-images --region eu-west-1 --filter tagStatus=TAGGED --output table > /tmp/ecr_output 2>&1; then
+    cat /tmp/ecr_output
+else
+    echo -e "\e[91m║ ERROR: Failed to fetch ECR images!\e[0m                            ║"
+fi
+echo "╟────────────────────────────────────────────────────────────────╢"
+
+# S3 Bucket Check
+echo "║ S3 Contents:                                                   ║"
+if (aws s3 ls s3://iykonect-aws-parallel/ && aws s3 ls s3://iykons-s3-storage/) > /tmp/s3_output 2>&1; then
+    cat /tmp/s3_output
+else
+    echo -e "\e[91m║ ERROR: Failed to list S3 bucket contents!\e[0m                     ║"
+fi
+echo "╟────────────────────────────────────────────────────────────────╢"
+
+# Container Status with Details
+echo "║ Docker Container Status:                                       ║"
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+echo "╟────────────────────────────────────────────────────────────────╢"
+
+# Recent Logs with Container Status
+echo "║ Recent System and Container Status Logs:                       ║"
+echo "║ System Logs:                                                  ║"
+tail -n 5 /var/log/user-data.log
+echo "║ Container Status:                                             ║"
+docker ps --format "{{.Names}}: {{.Status}}" > /tmp/container_status
+cat /tmp/container_status | while read line; do echo "║ $line"; done
+echo "╟────────────────────────────────────────────────────────────────╢"
+
+# Help Commands
+echo "║ Useful Commands:                                              ║"
+echo "║ - Use <status> to refresh this status board                   ║"
+echo "║ - tail -f /var/log/user-data.log to follow logs              ║"
+echo "║ - docker logs <container_name> -n 100 for container logs     ║"
+echo "╚════════════════════════════════════════════════════════════════╝"'
 
 # Execute status check on login
 status
@@ -37,11 +87,6 @@ chmod +x /etc/profile.d/iykonect-welcome.sh
 log "User environment configured"
 
 
-
-# Initial setup
-apt-get update
-apt-get install -y awscli jq
-log "Installed basic packages"
 
 
 # Verify S3 access
@@ -151,7 +196,7 @@ log "Grafana container status: $(docker inspect -f '{{.State.Status}}' iykon-gra
 log "Deploying React App..."
 docker run -d --network app-network --restart always --name react-app -p 3000:3000 \
     571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:react-standalone
-log "React App container status: $(docker inspect -f '{{.State.Status}}' react-standalone"
+log "React App container status: $(docker inspect -f '{{.State.Status}}' react-app)"
 
 # Grafana Renderer
 log "Deploying Grafana Renderer..."
@@ -159,7 +204,19 @@ docker run -d --network app-network --restart always --name renderer -p 8081:808
     grafana/grafana-image-renderer:latest
 log "Renderer container status: $(docker inspect -f '{{.State.Status}}' renderer)"
 
-log "All containers deployed. Final status:"
-docker ps --format "{{.Names}}: {{.Status}}" | while read line; do log "$line"; done
+# Log final deployment status
+log "=== Final Deployment Status ==="
+log "Network Status: $(docker network inspect app-network -f '{{.Name}} is {{.Driver}}')"
+log "Container Status Summary:"
+docker ps --format "{{.Names}}: {{.Status}}" | while read line; do 
+    log "$line"
+done
 
+# Log resource usage
+log "Resource Usage Summary:"
+docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}" | while read line; do
+    log "$line"
+done
+
+log "=== END Final Status ==="
 log "END - user data execution"

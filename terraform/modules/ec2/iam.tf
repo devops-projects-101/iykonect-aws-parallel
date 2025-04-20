@@ -35,8 +35,7 @@ resource "aws_iam_role_policy" "s3_access" {
           "s3:HeadBucket"
         ]
         Resource = [
-          "arn:aws:s3:::iykonect-aws-parallel",
-          "arn:aws:s3:::iykonect-aws-parallel/*"
+          "*"
         ]
       },
       {
