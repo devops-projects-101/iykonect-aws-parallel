@@ -27,7 +27,21 @@ resource "aws_instance" "main" {
   }
 
   vpc_security_group_ids = [aws_security_group.instance.id]
-  user_data = file("${path.module}/user-data.sh")
+  user_data = templatefile("${path.module}/user-data.sh", {
+    docker_registry    = local.ecr_registry
+    redis_image       = local.docker_images.redis.image
+    redis_port        = local.docker_images.redis.ports[0]
+    api_image         = local.docker_images.api.image
+    api_port          = local.docker_images.api.ports[0]
+    prometheus_image  = local.docker_images.prometheus.image
+    prometheus_port   = local.docker_images.prometheus.ports[0]
+    grafana_image     = local.docker_images.grafana.image
+    grafana_port      = local.docker_images.grafana.ports[0]
+    react_image       = local.docker_images.react.image
+    react_port        = local.docker_images.react.ports[0]
+    renderer_image    = local.docker_images.renderer.image
+    renderer_port     = local.docker_images.renderer.ports[0]
+  })
   iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
 
   tags = {

@@ -23,11 +23,6 @@ output "grafana_endpoint" {
   value       = module.ec2.grafana_endpoint
 }
 
-output "sonarqube_endpoint" {
-  description = "HTTP endpoint for SonarQube"
-  value       = module.ec2.sonarqube_endpoint
-}
-
 output "renderer_endpoint" {
   description = "HTTP endpoint for Grafana renderer"
   value       = module.ec2.renderer_endpoint

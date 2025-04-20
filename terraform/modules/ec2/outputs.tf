@@ -25,10 +25,6 @@ output "grafana_endpoint" {
   value = "http://${aws_instance.main.public_ip}:3100"
 }
 
-output "sonarqube_endpoint" {
-  value = "http://${aws_instance.main.public_ip}:9000"
-}
-
 output "renderer_endpoint" {
   value = "http://${aws_instance.main.public_ip}:8081"
 }
