@@ -67,7 +67,26 @@ echo "╔═══════════════════════�
 echo "║                     SYSTEM STATUS BOARD                        ║"
 echo "╠════════════════════════════════════════════════════════════════╣"
 
-# Terraform Outputs
+# System Logs Section
+echo "║ System Logs (Last 50 lines):                                  ║"
+echo "╟────────────────────────────────────────────────────────────────╢"
+tail -n 50 /var/log/user-data.log | while read -r line; do
+    echo "║ $line"
+done
+echo "╟────────────────────────────────────────────────────────────────╢"
+
+# Container Logs Summary
+echo "║ Recent Container Logs:                                         ║"
+for container in redis_service api prometheus iykon-graphana-app react-app renderer; do
+    echo "║ --- $container Logs (Last 50 lines) ---"
+    docker logs $container --tail 50 2>/dev/null | while read -r line; do
+        echo "║ $line"
+    done
+    echo "║"
+done
+echo "╟────────────────────────────────────────────────────────────────╢"
+
+# Terraform Status
 echo "║ Terraform Status:                                              ║"
 if aws s3 cp s3://iykonect-aws-parallel/terraform.tfstate /tmp/terraform.tfstate > /dev/null 2>&1; then
     echo "║ Infrastructure Endpoints:                                      ║"
@@ -122,10 +141,18 @@ cat /tmp/container_status | while read line; do echo "║ $line"; done
 echo "╟────────────────────────────────────────────────────────────────╢"
 
 # Help Commands
-echo "║ Useful Commands:                                               ║"
-echo "║ - Use <status> to refresh this status board                    ║"
-echo "║ - tail -f /var/log/user-data.log to follow logs                ║"
-echo "║ - docker logs <container_name> -n 100 for container logs       ║"
+echo "║ Useful Commands:                                              ║"
+echo "║ Container Logs:                                               ║"
+echo "║ - docker logs redis_service -n 100     # Redis logs           ║"
+echo "║ - docker logs api -n 100              # API logs             ║"
+echo "║ - docker logs prometheus -n 100        # Prometheus logs      ║"
+echo "║ - docker logs iykon-graphana-app -n 100 # Grafana logs       ║"
+echo "║ - docker logs react-app -n 100         # React App logs      ║"
+echo "║ - docker logs renderer -n 100          # Renderer logs       ║"
+echo "║                                                              ║"
+echo "║ System Logs:                                                 ║"
+echo "║ - tail -n 50 -f /var/log/user-data.log # Follow system logs ║"
+echo "║ - status                               # Show this board     ║"
 echo "╚════════════════════════════════════════════════════════════════╝"'
 
 # Execute status check on login
@@ -269,7 +296,16 @@ log "Renderer container status: $(docker inspect -f '{{.State.Status}}' renderer
 # Verify all containers are running
 log "=== Final Deployment Status ==="
 log "Network Status: $(docker network inspect app-network -f '{{.Name}} is {{.Driver}}')"
+
+# Log open ports first
+log "Open Ports Summary:"
+netstat -tulpn | grep LISTEN | while read line; do
+    log "$line"
+done
+
+# Log container status after ports
 log "Container Status Summary:"
+log "$(docker ps --format 'table {{.Names}}\t{{.Status}}\t{{.Ports}}')"
 docker ps --format "{{.Names}}: {{.Status}}" | while read line; do 
     log "$line"
 done
@@ -277,12 +313,6 @@ done
 # Log resource usage
 log "Resource Usage Summary:"
 docker stats --no-stream --format "table {{.Name}}\t{{.CPUPerc}}\t{{.MemUsage}}" | while read line; do
-    log "$line"
-done
-
-# Log open ports
-log "Open Ports Summary:"
-netstat -tulpn | grep LISTEN | while read line; do
     log "$line"
 done
 
