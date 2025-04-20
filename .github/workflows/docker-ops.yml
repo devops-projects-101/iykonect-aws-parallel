@@ -1,6 +1,9 @@
 name: 'Docker Operations'
 
 on:
+  push:
+    branches:
+      - '**'  # This will match all branches
   workflow_dispatch:
     inputs:
       action:
@@ -10,6 +13,8 @@ on:
         default: 'restart_containers'
         options:
           - restart_containers
+          - start_containers
+          - stop_containers
 
 permissions:
   contents: read

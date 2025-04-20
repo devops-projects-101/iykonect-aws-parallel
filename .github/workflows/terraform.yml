@@ -3,7 +3,7 @@ name: 'Iykons deploy'
 on:
   push:
     branches:
-      - main
+      - '**'  # This will match all branches
   pull_request:
   workflow_dispatch:
     inputs:
