@@ -125,6 +125,10 @@ log "Listing available secrets..."
 SECRETS_LIST=$(aws secretsmanager list-secrets --region ${AWS_REGION} --query "SecretList[].Name" --output text)
 log "Found secrets: ${SECRETS_LIST}"
 
+# Create a temporary directory for processing
+mkdir -p /opt/iykonect/tmp
+chmod 700 /opt/iykonect/tmp
+
 # Create the environment file
 touch /opt/iykonect/env/app.env
 chmod 600 /opt/iykonect/env/app.env
@@ -149,12 +153,21 @@ for FULL_SECRET_NAME in ${SECRETS_LIST}; do
     # Check if it's a JSON object
     if echo "$SECRET_VALUE" | jq -e . >/dev/null 2>&1; then
       log "Secret ${FULL_SECRET_NAME} is in JSON format, extracting key-value pairs"
-      # Extract all key-value pairs and add to env file
-      echo "$SECRET_VALUE" | jq -r 'to_entries | map("\(.key)=\(.value)") | join("\n")' >> /opt/iykonect/env/app.env
+      # Create a separate file for this secret to avoid issues with newlines and special characters
+      SECRET_FILE="/opt/iykonect/tmp/${SECRET_VAR_NAME}.json"
+      echo "$SECRET_VALUE" > "$SECRET_FILE"
+      
+      # Process each line of the JSON by flattening it first
+      jq -r 'paths(scalars) as $p | [$p | join("_"), getpath($p) | tostring] | join("=")' "$SECRET_FILE" | while read -r line; do
+        KEY=$(echo "$line" | cut -d'=' -f1)
+        VALUE=$(echo "$line" | cut -d'=' -f2-)
+        echo "${KEY}=\"${VALUE}\"" >> /opt/iykonect/env/app.env
+      done
     else
       # Not JSON, treat as simple string, use the extracted variable name
+      # Quote the value to handle special characters
       log "Secret ${FULL_SECRET_NAME} is a simple string, adding as ${SECRET_VAR_NAME}=<value>"
-      echo "${SECRET_VAR_NAME}=${SECRET_VALUE}" >> /opt/iykonect/env/app.env
+      echo "${SECRET_VAR_NAME}=\"${SECRET_VALUE}\"" >> /opt/iykonect/env/app.env
     fi
     log "Added secret ${FULL_SECRET_NAME} to environment file"
   else
@@ -162,15 +175,18 @@ for FULL_SECRET_NAME in ${SECRETS_LIST}; do
   fi
 done
 
+# Clean up temporary files
+rm -rf /opt/iykonect/tmp
+
 # If environment file is empty, add default values
 if [ ! -s /opt/iykonect/env/app.env ]; then
   log "WARNING: No secrets found or could be parsed, using default values"
   cat << EOF > /opt/iykonect/env/app.env
-DB_USERNAME=default_user
-DB_PASSWORD=default_password
-API_KEY=default_api_key
-JWT_SECRET=default_jwt_secret
-REDIS_PASSWORD=IYKONECTpassword
+DB_USERNAME="default_user"
+DB_PASSWORD="default_password"
+API_KEY="default_api_key"
+JWT_SECRET="default_jwt_secret"
+REDIS_PASSWORD="IYKONECTpassword"
 EOF
 fi
 
