@@ -112,30 +112,77 @@ chmod +x /usr/local/bin/status
 # Add status command to profile
 echo "alias status='/usr/local/bin/status'" >> /etc/profile.d/iykonect-welcome.sh
 
+# Get instance region from metadata service
+AWS_REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/[a-z]$//')
+log "Detected AWS region: ${AWS_REGION}"
+
 # Fetch secrets from AWS Secrets Manager and create environment file
 log "Fetching secrets from AWS Secrets Manager..."
 mkdir -p /opt/iykonect/env
-SECRETS=$(aws secretsmanager get-secret-value --secret-id iykonect-app-secrets --region ${AWS_REGION} --query SecretString --output text 2>/dev/null)
 
-if [ -z "$SECRETS" ]; then
-    log "WARNING: Could not fetch secrets from AWS Secrets Manager, using defaults where available"
-    # Create a default environment file
-    cat << EOF > /opt/iykonect/env/app.env
+# List all available secrets
+log "Listing available secrets..."
+SECRETS_LIST=$(aws secretsmanager list-secrets --region ${AWS_REGION} --query "SecretList[].Name" --output text)
+log "Found secrets: ${SECRETS_LIST}"
+
+# Create the environment file
+touch /opt/iykonect/env/app.env
+chmod 600 /opt/iykonect/env/app.env
+
+# Iterate through each secret and add its values to the environment file
+for FULL_SECRET_NAME in ${SECRETS_LIST}; do
+  # Extract variable name (part after the slash)
+  if [[ "$FULL_SECRET_NAME" == *"/"* ]]; then
+    # Extract everything after the last slash
+    SECRET_VAR_NAME=$(echo "$FULL_SECRET_NAME" | rev | cut -d'/' -f1 | rev)
+    log "Processing secret: ${FULL_SECRET_NAME} (using variable name: ${SECRET_VAR_NAME})"
+  else
+    # No slash, use the whole name
+    SECRET_VAR_NAME=$FULL_SECRET_NAME
+    log "Processing secret: ${FULL_SECRET_NAME}"
+  fi
+  
+  # Get the secret value
+  SECRET_VALUE=$(aws secretsmanager get-secret-value --secret-id ${FULL_SECRET_NAME} --region ${AWS_REGION} --query SecretString --output text 2>/dev/null)
+  
+  if [ -n "$SECRET_VALUE" ]; then
+    # Check if it's a JSON object
+    if echo "$SECRET_VALUE" | jq -e . >/dev/null 2>&1; then
+      log "Secret ${FULL_SECRET_NAME} is in JSON format, extracting key-value pairs"
+      # Extract all key-value pairs and add to env file
+      echo "$SECRET_VALUE" | jq -r 'to_entries | map("\(.key)=\(.value)") | join("\n")' >> /opt/iykonect/env/app.env
+    else
+      # Not JSON, treat as simple string, use the extracted variable name
+      log "Secret ${FULL_SECRET_NAME} is a simple string, adding as ${SECRET_VAR_NAME}=<value>"
+      echo "${SECRET_VAR_NAME}=${SECRET_VALUE}" >> /opt/iykonect/env/app.env
+    fi
+    log "Added secret ${FULL_SECRET_NAME} to environment file"
+  else
+    log "WARNING: Could not fetch secret ${FULL_SECRET_NAME}"
+  fi
+done
+
+# If environment file is empty, add default values
+if [ ! -s /opt/iykonect/env/app.env ]; then
+  log "WARNING: No secrets found or could be parsed, using default values"
+  cat << EOF > /opt/iykonect/env/app.env
 DB_USERNAME=default_user
 DB_PASSWORD=default_password
 API_KEY=default_api_key
 JWT_SECRET=default_jwt_secret
 REDIS_PASSWORD=IYKONECTpassword
 EOF
-else
-    log "Successfully fetched secrets from AWS Secrets Manager"
-    # Parse JSON secrets and create environment file
-    echo $SECRETS | jq -r 'to_entries | map("\(.key)=\(.value)") | join("\n")' > /opt/iykonect/env/app.env
 fi
 
-# Set permissions to secure the env file
-chmod 600 /opt/iykonect/env/app.env
-log "Environment file created at /opt/iykonect/env/app.env"
+# Remove duplicate entries (keeping the last occurrence)
+if [ -s /opt/iykonect/env/app.env ]; then
+  log "Removing duplicate entries from environment file..."
+  cat /opt/iykonect/env/app.env | awk -F '=' '!seen[$1]++' | tac > /opt/iykonect/env/app.env.tmp
+  tac /opt/iykonect/env/app.env.tmp > /opt/iykonect/env/app.env
+  rm /opt/iykonect/env/app.env.tmp
+fi
+
+log "Final environment file created at /opt/iykonect/env/app.env with $(wc -l < /opt/iykonect/env/app.env) variables"
 
 # Verify AWS Configuration first
 log "Verifying AWS configuration..."
@@ -199,20 +246,7 @@ log "System utilities installed"
 # Deploy containers in order of dependencies
 log "Starting container deployments"
 
-# 1. Redis (base service) - COMMENTED OUT
-# if ! check_port 6379; then
-#     log "ERROR: Port 6379 is not available for Redis"
-#     exit 1
-# fi
-# log "Deploying Redis..."
-# docker run -d --network app-network --restart always --name redis_service -p 6379:6379 \
-#     --env-file /opt/iykonect/env/app.env \
-#     571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:redis \
-#     redis-server --requirepass "${REDIS_PASSWORD:-IYKONECTpassword}" --bind 0.0.0.0
-# wait_for_container redis_service || exit 1
-# log "Redis container status: $(docker inspect -f '{{.State.Status}}' redis_service)"
-
-# 2. API (depends on Redis)
+# 1. API
 if ! check_port 8000; then
     log "ERROR: Port 8000 is not available for API"
     exit 1
@@ -224,30 +258,7 @@ docker run -d --network app-network --restart always --name api -p 8000:80 \
 wait_for_container api || exit 1
 log "API container status: $(docker inspect -f '{{.State.Status}}' api)"
 
-# 3. Prometheus (monitoring base) - COMMENTED OUT
-# if ! check_port 9090; then
-#     log "ERROR: Port 9090 is not available for Prometheus"
-#     exit 1
-# fi
-# log "Deploying Prometheus..."
-# docker run -d --network app-network --restart always --name prometheus -p 9090:9090 \
-#     571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:prometheus
-# wait_for_container prometheus || exit 1
-# log "Prometheus container status: $(docker inspect -f '{{.State.Status}}' prometheus)"
-
-# 4. Grafana (depends on Prometheus) - COMMENTED OUT
-# if ! check_port 3100; then
-#     log "ERROR: Port 3100 is not available for Grafana"
-#     exit 1
-# fi
-# log "Deploying Grafana..."
-# docker run -d --network app-network --restart always --name iykon-graphana-app -p 3100:3000 \
-#     --user root \
-#     571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:grafana
-# wait_for_container iykon-graphana-app || exit 1
-# log "Grafana container status: $(docker inspect -f '{{.State.Status}}' iykon-graphana-app)"
-
-# 5. React App (frontend)
+# 2. React App (frontend)
 if ! check_port 3000; then
     log "ERROR: Port 3000 is not available for React App"
     exit 1
@@ -260,17 +271,6 @@ docker run -d --network app-network --restart always --name react-app -p 3000:30
     571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:web-latest
 wait_for_container react-app || exit 1
 log "React App container status: $(docker inspect -f '{{.State.Status}}' react-app)"
-
-# 6. Grafana Renderer (depends on Grafana) - COMMENTED OUT
-# if ! check_port 8081; then
-#     log "ERROR: Port 8081 is not available for Renderer"
-#     exit 1
-# fi
-# log "Deploying Grafana Renderer..."
-# docker run -d --network app-network --restart always --name renderer -p 8081:8081 \
-#     grafana/grafana-image-renderer:latest
-# wait_for_container renderer || exit 1
-# log "Renderer container status: $(docker inspect -f '{{.State.Status}}' renderer)"
 
 # Verify active containers only
 log "=== Final Deployment Status ==="
