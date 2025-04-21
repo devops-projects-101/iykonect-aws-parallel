@@ -149,6 +149,12 @@ for FULL_SECRET_NAME in ${SECRETS_LIST}; do
     log "Processing secret: ${FULL_SECRET_NAME}"
   fi
   
+  # Skip explicitly excluded secrets
+  if [[ "$SECRET_VAR_NAME" == "QA" || "$SECRET_VAR_NAME" == "Production" ]]; then
+    log "Skipping excluded secret: ${FULL_SECRET_NAME} (${SECRET_VAR_NAME})"
+    continue
+  fi
+  
   # Get the secret value
   SECRET_VALUE=$(aws secretsmanager get-secret-value --secret-id ${FULL_SECRET_NAME} --region ${AWS_REGION} --query SecretString --output text 2>/dev/null)
   
