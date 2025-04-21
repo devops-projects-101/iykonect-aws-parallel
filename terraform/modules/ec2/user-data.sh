@@ -112,6 +112,31 @@ chmod +x /usr/local/bin/status
 # Add status command to profile
 echo "alias status='/usr/local/bin/status'" >> /etc/profile.d/iykonect-welcome.sh
 
+# Fetch secrets from AWS Secrets Manager and create environment file
+log "Fetching secrets from AWS Secrets Manager..."
+mkdir -p /opt/iykonect/env
+SECRETS=$(aws secretsmanager get-secret-value --secret-id iykonect-app-secrets --region ${AWS_REGION} --query SecretString --output text 2>/dev/null)
+
+if [ -z "$SECRETS" ]; then
+    log "WARNING: Could not fetch secrets from AWS Secrets Manager, using defaults where available"
+    # Create a default environment file
+    cat << EOF > /opt/iykonect/env/app.env
+DB_USERNAME=default_user
+DB_PASSWORD=default_password
+API_KEY=default_api_key
+JWT_SECRET=default_jwt_secret
+REDIS_PASSWORD=IYKONECTpassword
+EOF
+else
+    log "Successfully fetched secrets from AWS Secrets Manager"
+    # Parse JSON secrets and create environment file
+    echo $SECRETS | jq -r 'to_entries | map("\(.key)=\(.value)") | join("\n")' > /opt/iykonect/env/app.env
+fi
+
+# Set permissions to secure the env file
+chmod 600 /opt/iykonect/env/app.env
+log "Environment file created at /opt/iykonect/env/app.env"
+
 # Verify AWS Configuration first
 log "Verifying AWS configuration..."
 if ! aws sts get-caller-identity > /dev/null 2>&1; then
@@ -174,18 +199,18 @@ log "System utilities installed"
 # Deploy containers in order of dependencies
 log "Starting container deployments"
 
-# 1. Redis (base service)
-if ! check_port 6379; then
-    log "ERROR: Port 6379 is not available for Redis"
-    exit 1
-fi
-log "Deploying Redis..."
-docker run -d --network app-network --restart always --name redis_service -p 6379:6379 \
-    -e REDIS_PASSWORD=IYKONECTpassword \
-    571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:redis \
-    redis-server --requirepass IYKONECTpassword --bind 0.0.0.0
-wait_for_container redis_service || exit 1
-log "Redis container status: $(docker inspect -f '{{.State.Status}}' redis_service)"
+# 1. Redis (base service) - COMMENTED OUT
+# if ! check_port 6379; then
+#     log "ERROR: Port 6379 is not available for Redis"
+#     exit 1
+# fi
+# log "Deploying Redis..."
+# docker run -d --network app-network --restart always --name redis_service -p 6379:6379 \
+#     --env-file /opt/iykonect/env/app.env \
+#     571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:redis \
+#     redis-server --requirepass "${REDIS_PASSWORD:-IYKONECTpassword}" --bind 0.0.0.0
+# wait_for_container redis_service || exit 1
+# log "Redis container status: $(docker inspect -f '{{.State.Status}}' redis_service)"
 
 # 2. API (depends on Redis)
 if ! check_port 8000; then
@@ -194,32 +219,33 @@ if ! check_port 8000; then
 fi
 log "Deploying API..."
 docker run -d --network app-network --restart always --name api -p 8000:80 \
-    571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:api
+    --env-file /opt/iykonect/env/app.env \
+    571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:api-latest
 wait_for_container api || exit 1
 log "API container status: $(docker inspect -f '{{.State.Status}}' api)"
 
-# 3. Prometheus (monitoring base)
-if ! check_port 9090; then
-    log "ERROR: Port 9090 is not available for Prometheus"
-    exit 1
-fi
-log "Deploying Prometheus..."
-docker run -d --network app-network --restart always --name prometheus -p 9090:9090 \
-    571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:prometheus
-wait_for_container prometheus || exit 1
-log "Prometheus container status: $(docker inspect -f '{{.State.Status}}' prometheus)"
+# 3. Prometheus (monitoring base) - COMMENTED OUT
+# if ! check_port 9090; then
+#     log "ERROR: Port 9090 is not available for Prometheus"
+#     exit 1
+# fi
+# log "Deploying Prometheus..."
+# docker run -d --network app-network --restart always --name prometheus -p 9090:9090 \
+#     571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:prometheus
+# wait_for_container prometheus || exit 1
+# log "Prometheus container status: $(docker inspect -f '{{.State.Status}}' prometheus)"
 
-# 4. Grafana (depends on Prometheus)
-if ! check_port 3100; then
-    log "ERROR: Port 3100 is not available for Grafana"
-    exit 1
-fi
-log "Deploying Grafana..."
-docker run -d --network app-network --restart always --name iykon-graphana-app -p 3100:3000 \
-    --user root \
-    571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:grafana
-wait_for_container iykon-graphana-app || exit 1
-log "Grafana container status: $(docker inspect -f '{{.State.Status}}' iykon-graphana-app)"
+# 4. Grafana (depends on Prometheus) - COMMENTED OUT
+# if ! check_port 3100; then
+#     log "ERROR: Port 3100 is not available for Grafana"
+#     exit 1
+# fi
+# log "Deploying Grafana..."
+# docker run -d --network app-network --restart always --name iykon-graphana-app -p 3100:3000 \
+#     --user root \
+#     571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:grafana
+# wait_for_container iykon-graphana-app || exit 1
+# log "Grafana container status: $(docker inspect -f '{{.State.Status}}' iykon-graphana-app)"
 
 # 5. React App (frontend)
 if ! check_port 3000; then
@@ -227,23 +253,26 @@ if ! check_port 3000; then
     exit 1
 fi
 log "Deploying React App..."
+# Add the API_ENDPOINT to the env file dynamically
+echo "API_ENDPOINT=http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):8000" >> /opt/iykonect/env/app.env
 docker run -d --network app-network --restart always --name react-app -p 3000:3000 \
-    571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:react-standalone
+    --env-file /opt/iykonect/env/app.env \
+    571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:web-latest
 wait_for_container react-app || exit 1
 log "React App container status: $(docker inspect -f '{{.State.Status}}' react-app)"
 
-# 6. Grafana Renderer (depends on Grafana)
-if ! check_port 8081; then
-    log "ERROR: Port 8081 is not available for Renderer"
-    exit 1
-fi
-log "Deploying Grafana Renderer..."
-docker run -d --network app-network --restart always --name renderer -p 8081:8081 \
-    grafana/grafana-image-renderer:latest
-wait_for_container renderer || exit 1
-log "Renderer container status: $(docker inspect -f '{{.State.Status}}' renderer)"
+# 6. Grafana Renderer (depends on Grafana) - COMMENTED OUT
+# if ! check_port 8081; then
+#     log "ERROR: Port 8081 is not available for Renderer"
+#     exit 1
+# fi
+# log "Deploying Grafana Renderer..."
+# docker run -d --network app-network --restart always --name renderer -p 8081:8081 \
+#     grafana/grafana-image-renderer:latest
+# wait_for_container renderer || exit 1
+# log "Renderer container status: $(docker inspect -f '{{.State.Status}}' renderer)"
 
-# Verify all containers are running
+# Verify active containers only
 log "=== Final Deployment Status ==="
 log "Network Status: $(docker network inspect app-network -f '{{.Name}} is {{.Driver}}')"
 

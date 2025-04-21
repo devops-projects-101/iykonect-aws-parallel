@@ -78,6 +78,25 @@ resource "aws_iam_role_policy" "ecr_access" {
   })
 }
 
+resource "aws_iam_role_policy" "secrets_manager_access" {
+  name = "${var.prefix}-secrets-manager-access"
+  role = aws_iam_role.ec2_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret"
+        ]
+        Resource = "arn:aws:secretsmanager:*:*:secret:iykonect-app-secrets*"
+      }
+    ]
+  })
+}
+
 resource "aws_iam_instance_profile" "ec2_profile" {
   name = "${var.prefix}-ec2-profile"
   role = aws_iam_role.ec2_role.name
