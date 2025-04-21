@@ -125,15 +125,18 @@ log "Listing available secrets..."
 SECRETS_LIST=$(aws secretsmanager list-secrets --region ${AWS_REGION} --query "SecretList[].Name" --output text)
 log "Found secrets: ${SECRETS_LIST}"
 
-# Create a temporary directory for processing
-mkdir -p /opt/iykonect/tmp
-chmod 700 /opt/iykonect/tmp
+# Two types of environment files:
+# 1. A JSON config file for application configuration
+mkdir -p /opt/iykonect/config
+touch /opt/iykonect/config/app.json
+chmod 600 /opt/iykonect/config/app.json
+echo "{}" > /opt/iykonect/config/app.json
 
-# Create the environment file
+# 2. A simple .env file for Docker (key=value format without spaces or quotes)
 touch /opt/iykonect/env/app.env
 chmod 600 /opt/iykonect/env/app.env
 
-# Iterate through each secret and add its values to the environment file
+# Iterate through each secret
 for FULL_SECRET_NAME in ${SECRETS_LIST}; do
   # Extract variable name (part after the slash)
   if [[ "$FULL_SECRET_NAME" == *"/"* ]]; then
@@ -152,41 +155,34 @@ for FULL_SECRET_NAME in ${SECRETS_LIST}; do
   if [ -n "$SECRET_VALUE" ]; then
     # Check if it's a JSON object
     if echo "$SECRET_VALUE" | jq -e . >/dev/null 2>&1; then
-      log "Secret ${FULL_SECRET_NAME} is in JSON format, extracting key-value pairs"
-      # Create a separate file for this secret to avoid issues with newlines and special characters
-      SECRET_FILE="/opt/iykonect/tmp/${SECRET_VAR_NAME}.json"
-      echo "$SECRET_VALUE" > "$SECRET_FILE"
+      log "Secret ${FULL_SECRET_NAME} is in JSON format"
       
-      # Process each line of the JSON by flattening it first
-      jq -r 'paths(scalars) as $p | [$p | join("_"), getpath($p) | tostring] | join("=")' "$SECRET_FILE" | while read -r line; do
-        KEY=$(echo "$line" | cut -d'=' -f1)
-        VALUE=$(echo "$line" | cut -d'=' -f2-)
-        echo "${KEY}=\"${VALUE}\"" >> /opt/iykonect/env/app.env
-      done
+      # 1. Add it to the JSON config file
+      jq -s '.[0] * .[1]' /opt/iykonect/config/app.json <(echo "$SECRET_VALUE") > /opt/iykonect/config/app.json.tmp
+      mv /opt/iykonect/config/app.json.tmp /opt/iykonect/config/app.json
+      
+      # 2. Extract top-level keys only as flattened values for the env file
+      echo "$SECRET_VALUE" | jq -r 'to_entries | .[] | select(.value | type != "object" and type != "array") | "\(.key)=\(.value)"' >> /opt/iykonect/env/app.env
     else
-      # Not JSON, treat as simple string, use the extracted variable name
-      # Quote the value to handle special characters
+      # Not JSON, add as simple key=value
       log "Secret ${FULL_SECRET_NAME} is a simple string, adding as ${SECRET_VAR_NAME}=<value>"
-      echo "${SECRET_VAR_NAME}=\"${SECRET_VALUE}\"" >> /opt/iykonect/env/app.env
+      echo "${SECRET_VAR_NAME}=${SECRET_VALUE}" >> /opt/iykonect/env/app.env
     fi
-    log "Added secret ${FULL_SECRET_NAME} to environment file"
+    log "Added secret ${FULL_SECRET_NAME} to environment/config files"
   else
     log "WARNING: Could not fetch secret ${FULL_SECRET_NAME}"
   fi
 done
 
-# Clean up temporary files
-rm -rf /opt/iykonect/tmp
-
 # If environment file is empty, add default values
 if [ ! -s /opt/iykonect/env/app.env ]; then
   log "WARNING: No secrets found or could be parsed, using default values"
   cat << EOF > /opt/iykonect/env/app.env
-DB_USERNAME="default_user"
-DB_PASSWORD="default_password"
-API_KEY="default_api_key"
-JWT_SECRET="default_jwt_secret"
-REDIS_PASSWORD="IYKONECTpassword"
+DB_USERNAME=default_user
+DB_PASSWORD=default_password
+API_KEY=default_api_key
+JWT_SECRET=default_jwt_secret
+REDIS_PASSWORD=IYKONECTpassword
 EOF
 fi
 
@@ -199,6 +195,11 @@ if [ -s /opt/iykonect/env/app.env ]; then
 fi
 
 log "Final environment file created at /opt/iykonect/env/app.env with $(wc -l < /opt/iykonect/env/app.env) variables"
+log "Full config JSON created at /opt/iykonect/config/app.json"
+
+# Add the API_ENDPOINT to the env file dynamically
+PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+echo "API_ENDPOINT=http://${PUBLIC_IP}:8000" >> /opt/iykonect/env/app.env
 
 # Verify AWS Configuration first
 log "Verifying AWS configuration..."
@@ -270,6 +271,7 @@ fi
 log "Deploying API..."
 docker run -d --network app-network --restart always --name api -p 8000:80 \
     --env-file /opt/iykonect/env/app.env \
+    -v /opt/iykonect/config:/app/config \
     571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:api-latest
 wait_for_container api || exit 1
 log "API container status: $(docker inspect -f '{{.State.Status}}' api)"
@@ -280,10 +282,9 @@ if ! check_port 3000; then
     exit 1
 fi
 log "Deploying React App..."
-# Add the API_ENDPOINT to the env file dynamically
-echo "API_ENDPOINT=http://$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4):8000" >> /opt/iykonect/env/app.env
 docker run -d --network app-network --restart always --name react-app -p 3000:3000 \
     --env-file /opt/iykonect/env/app.env \
+    -v /opt/iykonect/config:/app/config \
     571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:web-latest
 wait_for_container react-app || exit 1
 log "React App container status: $(docker inspect -f '{{.State.Status}}' react-app)"
