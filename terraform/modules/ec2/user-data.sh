@@ -89,7 +89,8 @@ echo
 # Container Logs
 echo "📋 RECENT CONTAINER LOGS"
 echo "──────────────────"
-for container in redis_service api prometheus iykon-graphana-app react-app renderer; do
+#for container in redis_service api prometheus iykon-graphana-app react-app renderer; 
+for container in api react-app; do
     if docker ps -q -f name=$container >/dev/null 2>&1; then
         echo "[$container]"
         docker logs --tail 5 $container 2>&1
@@ -116,27 +117,26 @@ echo "alias status='/usr/local/bin/status'" >> /etc/profile.d/iykonect-welcome.s
 AWS_REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/[a-z]$//')
 log "Detected AWS region: ${AWS_REGION}"
 
-# Fetch secrets from AWS Secrets Manager and create environment file
+# Fetch secrets from AWS Secrets Manager and create environment files
 log "Fetching secrets from AWS Secrets Manager..."
 mkdir -p /opt/iykonect/env
+mkdir -p /opt/iykonect/config
 
 # List all available secrets
 log "Listing available secrets..."
 SECRETS_LIST=$(aws secretsmanager list-secrets --region ${AWS_REGION} --query "SecretList[].Name" --output text)
 log "Found secrets: ${SECRETS_LIST}"
 
-# Two types of environment files:
-# 1. A JSON config file for application configuration
-mkdir -p /opt/iykonect/config
-touch /opt/iykonect/config/app.json
-chmod 600 /opt/iykonect/config/app.json
-echo "{}" > /opt/iykonect/config/app.json
-
-# 2. A simple .env file for Docker (key=value format without spaces or quotes)
+# Create a clean env file (simple key=value pairs only)
 touch /opt/iykonect/env/app.env
 chmod 600 /opt/iykonect/env/app.env
 
-# Iterate through each secret
+# Create JSON config directory
+mkdir -p /opt/iykonect/config
+echo "{}" > /opt/iykonect/config/app.json
+chmod 600 /opt/iykonect/config/app.json
+
+# Process each secret separately
 for FULL_SECRET_NAME in ${SECRETS_LIST}; do
   # Extract variable name (part after the slash)
   if [[ "$FULL_SECRET_NAME" == *"/"* ]]; then
@@ -153,30 +153,39 @@ for FULL_SECRET_NAME in ${SECRETS_LIST}; do
   SECRET_VALUE=$(aws secretsmanager get-secret-value --secret-id ${FULL_SECRET_NAME} --region ${AWS_REGION} --query SecretString --output text 2>/dev/null)
   
   if [ -n "$SECRET_VALUE" ]; then
-    # Check if it's a JSON object
+    # Check if the secret is in JSON format
     if echo "$SECRET_VALUE" | jq -e . >/dev/null 2>&1; then
-      log "Secret ${FULL_SECRET_NAME} is in JSON format"
+      log "Secret ${FULL_SECRET_NAME} is in JSON format, adding to config directory"
       
-      # 1. Add it to the JSON config file
+      # Save the JSON object to its own config file
+      echo "$SECRET_VALUE" > "/opt/iykonect/config/${SECRET_VAR_NAME}.json"
+      
+      # Also merge into the main config file
       jq -s '.[0] * .[1]' /opt/iykonect/config/app.json <(echo "$SECRET_VALUE") > /opt/iykonect/config/app.json.tmp
       mv /opt/iykonect/config/app.json.tmp /opt/iykonect/config/app.json
-      
-      # 2. Extract top-level keys only as flattened values for the env file
-      echo "$SECRET_VALUE" | jq -r 'to_entries | .[] | select(.value | type != "object" and type != "array") | "\(.key)=\(.value)"' >> /opt/iykonect/env/app.env
+
+      # For JSON objects, we don't add them to the env file
     else
-      # Not JSON, add as simple key=value
-      log "Secret ${FULL_SECRET_NAME} is a simple string, adding as ${SECRET_VAR_NAME}=<value>"
-      echo "${SECRET_VAR_NAME}=${SECRET_VALUE}" >> /opt/iykonect/env/app.env
+      # Check if it's an SSL key (contains BEGIN and PRIVATE KEY or CERTIFICATE)
+      if [[ "$SECRET_VALUE" == *"BEGIN"* && ("$SECRET_VALUE" == *"PRIVATE KEY"* || "$SECRET_VALUE" == *"CERTIFICATE"*) ]]; then
+        log "Secret ${FULL_SECRET_NAME} is an SSL key, saving to config file"
+        echo "$SECRET_VALUE" > "/opt/iykonect/config/${SECRET_VAR_NAME}.pem"
+        chmod 600 "/opt/iykonect/config/${SECRET_VAR_NAME}.pem"
+      else
+        # Simple string value - safe to add to env file
+        log "Secret ${FULL_SECRET_NAME} is a simple key=value, adding to env file"
+        echo "${SECRET_VAR_NAME}=${SECRET_VALUE}" >> /opt/iykonect/env/app.env
+      fi
     fi
-    log "Added secret ${FULL_SECRET_NAME} to environment/config files"
+    log "Processed secret ${FULL_SECRET_NAME}"
   else
     log "WARNING: Could not fetch secret ${FULL_SECRET_NAME}"
   fi
 done
 
-# If environment file is empty, add default values
+# Add default values if the env file is empty
 if [ ! -s /opt/iykonect/env/app.env ]; then
-  log "WARNING: No secrets found or could be parsed, using default values"
+  log "WARNING: No simple secrets found, using default values"
   cat << EOF > /opt/iykonect/env/app.env
 DB_USERNAME=default_user
 DB_PASSWORD=default_password
@@ -186,20 +195,20 @@ REDIS_PASSWORD=IYKONECTpassword
 EOF
 fi
 
-# Remove duplicate entries (keeping the last occurrence)
-if [ -s /opt/iykonect/env/app.env ]; then
-  log "Removing duplicate entries from environment file..."
-  cat /opt/iykonect/env/app.env | awk -F '=' '!seen[$1]++' | tac > /opt/iykonect/env/app.env.tmp
-  tac /opt/iykonect/env/app.env.tmp > /opt/iykonect/env/app.env
-  rm /opt/iykonect/env/app.env.tmp
-fi
-
-log "Final environment file created at /opt/iykonect/env/app.env with $(wc -l < /opt/iykonect/env/app.env) variables"
-log "Full config JSON created at /opt/iykonect/config/app.json"
-
 # Add the API_ENDPOINT to the env file dynamically
 PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
 echo "API_ENDPOINT=http://${PUBLIC_IP}:8000" >> /opt/iykonect/env/app.env
+
+# Remove duplicate entries from env file
+if [ -s /opt/iykonect/env/app.env ]; then
+  log "Removing duplicate entries from environment file..."
+  awk -F '=' '!seen[$1]++' /opt/iykonect/env/app.env > /opt/iykonect/env/app.env.tmp
+  mv /opt/iykonect/env/app.env.tmp /opt/iykonect/env/app.env
+fi
+
+# Final report on processed files
+log "Final environment file created at /opt/iykonect/env/app.env with $(wc -l < /opt/iykonect/env/app.env) variables"
+log "Config files created in /opt/iykonect/config/ with $(find /opt/iykonect/config/ -type f | wc -l) files"
 
 # Verify AWS Configuration first
 log "Verifying AWS configuration..."
@@ -263,17 +272,53 @@ log "System utilities installed"
 # Deploy containers in order of dependencies
 log "Starting container deployments"
 
+# Function to run docker command and capture output
+run_docker() {
+  local command="$1"
+  local container_name="$2"
+  
+  log "Running docker command: $command"
+  
+  # Execute command and capture output
+  local output
+  output=$(eval "$command" 2>&1) || {
+    local exit_code=$?
+    log "ERROR: Docker command failed with exit code $exit_code"
+    log "ERROR OUTPUT: $output"
+    return $exit_code
+  }
+  
+  # Log successful output
+  log "Docker command executed successfully"
+  log "OUTPUT: $output"
+  
+  # Wait for container to be ready
+  wait_for_container "$container_name" || {
+    log "ERROR: Container $container_name failed to start properly"
+    log "Container logs:"
+    docker logs "$container_name" 2>&1 | while read -r line; do
+      log "[$container_name] $line"
+    done
+    return 1
+  }
+  
+  log "Container $container_name is running successfully"
+  return 0
+}
+
 # 1. API
 if ! check_port 8000; then
     log "ERROR: Port 8000 is not available for API"
     exit 1
 fi
 log "Deploying API..."
-docker run -d --network app-network --restart always --name api -p 8000:80 \
+run_docker "docker run -d --network app-network --restart always --name api -p 8000:80 \
     --env-file /opt/iykonect/env/app.env \
     -v /opt/iykonect/config:/app/config \
-    571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:api-latest
-wait_for_container api || exit 1
+    571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:api-latest" "api" || {
+    log "FATAL: Failed to deploy API container"
+    exit 1
+}
 log "API container status: $(docker inspect -f '{{.State.Status}}' api)"
 
 # 2. React App (frontend)
@@ -282,11 +327,13 @@ if ! check_port 3000; then
     exit 1
 fi
 log "Deploying React App..."
-docker run -d --network app-network --restart always --name react-app -p 3000:3000 \
+run_docker "docker run -d --network app-network --restart always --name react-app -p 3000:3000 \
     --env-file /opt/iykonect/env/app.env \
     -v /opt/iykonect/config:/app/config \
-    571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:web-latest
-wait_for_container react-app || exit 1
+    571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:web-latest" "react-app" || {
+    log "FATAL: Failed to deploy React App container"
+    exit 1
+}
 log "React App container status: $(docker inspect -f '{{.State.Status}}' react-app)"
 
 # Verify active containers only
