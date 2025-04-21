@@ -88,10 +88,21 @@ resource "aws_iam_role_policy" "secrets_manager_access" {
       {
         Effect = "Allow"
         Action = [
+          "secretsmanager:GetResourcePolicy",
           "secretsmanager:GetSecretValue",
-          "secretsmanager:DescribeSecret"
+          "secretsmanager:DescribeSecret",
+          "secretsmanager:ListSecretVersionIds",
+          "secretsmanager:ListSecrets",
+          "secretsmanager:UpdateSecret",
+          "secretsmanager:UpdateSecretVersionStage",
+          "secretsmanager:PutSecretValue",
+          "secretsmanager:DeleteSecret",
+          "secretsmanager:TagResource",
+          "secretsmanager:UntagResource",
+          "secretsmanager:RotateSecret",
+          "secretsmanager:RestoreSecret"
         ]
-        Resource = "arn:aws:secretsmanager:*:*:secret:iykonect-app-secrets*"
+        Resource = "*"  # Access to all secrets in Secrets Manager
       }
     ]
   })
