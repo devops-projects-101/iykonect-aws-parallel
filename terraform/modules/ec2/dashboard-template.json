@@ -1,0 +1,142 @@
+{
+  "widgets": [
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 0,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          ["IYKonect/EC2", "cpu_usage_active", "host", "INSTANCE_ID", {"stat": "Average"}],
+          ["...", "cpu_usage_system", ".", ".", {"stat": "Average"}],
+          ["...", "cpu_usage_user", ".", ".", {"stat": "Average"}]
+        ],
+        "period": 60,
+        "title": "CPU Usage",
+        "region": "AWS_REGION",
+        "view": "timeSeries",
+        "stacked": false
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 0,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          ["IYKonect/EC2", "mem_used_percent", "host", "INSTANCE_ID", {"stat": "Average"}]
+        ],
+        "period": 60,
+        "title": "Memory Usage",
+        "region": "AWS_REGION",
+        "view": "timeSeries",
+        "stacked": false,
+        "yAxis": {
+          "left": {
+            "min": 0,
+            "max": 100
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 6,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          ["IYKonect/EC2", "disk_used_percent", "host", "INSTANCE_ID", "path", "/", {"stat": "Average"}]
+        ],
+        "period": 60,
+        "title": "Disk Usage",
+        "region": "AWS_REGION",
+        "view": "timeSeries",
+        "stacked": false,
+        "yAxis": {
+          "left": {
+            "min": 0,
+            "max": 100
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 6,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          ["IYKonect/EC2", "net_bytes_sent", "host", "INSTANCE_ID", "interface", "eth0", {"stat": "Sum"}],
+          ["...", "net_bytes_recv", ".", ".", ".", ".", {"stat": "Sum"}]
+        ],
+        "period": 60,
+        "title": "Network Traffic",
+        "region": "AWS_REGION",
+        "view": "timeSeries",
+        "stacked": false
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 12,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          ["IYKonect/EC2", "container_cpu_usage_percent", "host", "INSTANCE_ID", "container_name", "api", {"stat": "Average"}],
+          ["...", ".", ".", ".", ".", "react-app", {"stat": "Average"}]
+        ],
+        "period": 60,
+        "title": "Container CPU Usage",
+        "region": "AWS_REGION",
+        "view": "timeSeries",
+        "stacked": false
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 12,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          ["IYKonect/EC2", "container_memory_usage_percent", "host", "INSTANCE_ID", "container_name", "api", {"stat": "Average"}],
+          ["...", ".", ".", ".", ".", "react-app", {"stat": "Average"}]
+        ],
+        "period": 60,
+        "title": "Container Memory Usage",
+        "region": "AWS_REGION",
+        "view": "timeSeries",
+        "stacked": false,
+        "yAxis": {
+          "left": {
+            "min": 0,
+            "max": 100
+          }
+        }
+      }
+    },
+    {
+      "type": "log",
+      "x": 0,
+      "y": 18,
+      "width": 24,
+      "height": 6,
+      "properties": {
+        "query": "SOURCE 'iykonect-user-data-logs' | fields @timestamp, @message\n| sort @timestamp desc\n| limit 100",
+        "region": "AWS_REGION",
+        "title": "User Data Logs",
+        "view": "table"
+      }
+    }
+  ]
+}

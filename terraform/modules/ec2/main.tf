@@ -8,7 +8,9 @@ data "aws_ami" "ubuntu" {
   }
 }
 
-
+data "template_file" "user_data" {
+  template = file("${path.module}/user-data.sh")
+}
 
 resource "aws_instance" "main" {
   ami           = data.aws_ami.ubuntu.id
@@ -27,8 +29,8 @@ resource "aws_instance" "main" {
   }
 
   vpc_security_group_ids = [aws_security_group.instance.id]
-  user_data = file("${path.module}/user-data.sh")
-  iam_instance_profile = aws_iam_instance_profile.ec2_profile.name
+  user_data_base64       = base64gzip(data.template_file.user_data.rendered)
+  iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
 
   tags = {
     Name        = "${var.prefix}-instance"
