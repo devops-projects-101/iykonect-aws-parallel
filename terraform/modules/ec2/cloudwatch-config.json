@@ -106,6 +106,9 @@
           "container_memory_usage_percent",
           "container_memory_usage",
           "network_io_usage"
+        ],
+        "resources": [
+          "*"
         ]
       }
     }
