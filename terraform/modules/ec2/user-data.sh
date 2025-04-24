@@ -46,6 +46,7 @@ wait_for_container() {
 # Initial setup
 log "Starting initial setup..."
 apt-get update && apt-get install -y awscli jq apt-transport-https ca-certificates curl gnupg lsb-release htop collectd
+log "Package installation completed"
 
 # Get instance metadata
 AWS_REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/[a-z]$//')
@@ -82,10 +83,13 @@ chmod +x /usr/local/bin/status
 echo "alias status='/usr/local/bin/status'" >> /etc/profile.d/iykonect-welcome.sh
 
 # Install CloudWatch agent
-log "Installing CloudWatch agent..."
+log "==============================================="
+log "Starting CloudWatch agent installation process"
+log "==============================================="
 wget -q https://amazoncloudwatch-agent.s3.amazonaws.com/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb -O /tmp/amazon-cloudwatch-agent.deb
 dpkg -i -E /tmp/amazon-cloudwatch-agent.deb
 rm /tmp/amazon-cloudwatch-agent.deb
+log "CloudWatch agent package installation completed"
 
 # Configure CloudWatch agent
 log "Configuring CloudWatch agent..."
@@ -133,17 +137,52 @@ cat > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json << 'EOF'
         "measurement": ["bytes_sent", "bytes_recv"]
       },
       "docker": {
-        "metrics_collection_interval": 60
+        "resources": ["*"],
+        "metrics_collection_interval": 60,
+        "measurement": [
+          "container_cpu_usage_percent",
+          "container_memory_usage_percent",
+          "container_memory_usage",
+          "network_io_usage"
+        ]
       }
     }
   }
 }
 EOF
+log "CloudWatch agent configuration file created"
 
-# Start CloudWatch agent
-/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+# Start CloudWatch agent with detailed logging
+log "==============================================="
+log "Starting CloudWatch agent service"
+log "==============================================="
+log "Running agent control command to fetch config..."
+CW_OUTPUT=$(/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json 2>&1)
+log "CloudWatch agent control command output:"
+echo "$CW_OUTPUT" | while read -r line; do
+  log "CW-AGENT: $line"
+done
+
+# Enable and start service
+log "Enabling CloudWatch agent service..."
 systemctl enable amazon-cloudwatch-agent
+log "Starting CloudWatch agent service..."
 systemctl start amazon-cloudwatch-agent
+
+# Verify CloudWatch agent status
+CW_STATUS=$(systemctl status amazon-cloudwatch-agent | grep "Active:" | awk '{print $2}')
+if [ "$CW_STATUS" = "active" ]; then
+  log "CloudWatch agent service started successfully (status: $CW_STATUS)"
+else
+  log "WARNING: CloudWatch agent may not have started correctly (status: $CW_STATUS)"
+  log "Checking CloudWatch agent logs:"
+  tail -n 20 /opt/aws/amazon-cloudwatch-agent/logs/amazon-cloudwatch-agent.log | while read -r line; do
+    log "CW-LOG: $line"
+  done
+fi
+log "==============================================="
+log "CloudWatch agent setup completed"
+log "==============================================="
 
 # Create CloudWatch Dashboard
 log "Creating CloudWatch dashboard..."
