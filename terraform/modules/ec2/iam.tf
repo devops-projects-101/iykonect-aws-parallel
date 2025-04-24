@@ -108,6 +108,39 @@ resource "aws_iam_role_policy" "secrets_manager_access" {
   })
 }
 
+resource "aws_iam_role_policy" "cloudwatch_access" {
+  name = "${var.prefix}-cloudwatch-access"
+  role = aws_iam_role.ec2_role.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "cloudwatch:PutMetricData",
+          "cloudwatch:GetMetricData",
+          "cloudwatch:GetMetricStatistics",
+          "cloudwatch:ListMetrics",
+          "cloudwatch:PutDashboard",
+          "cloudwatch:GetDashboard",
+          "cloudwatch:ListDashboards",
+          "cloudwatch:PutMetricAlarm",
+          "cloudwatch:DescribeAlarms",
+          "ec2:DescribeTags",
+          "ec2:DescribeInstances",
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "logs:DescribeLogStreams",
+          "logs:DescribeLogGroups"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
 resource "aws_iam_instance_profile" "ec2_profile" {
   name = "${var.prefix}-ec2-profile"
   role = aws_iam_role.ec2_role.name

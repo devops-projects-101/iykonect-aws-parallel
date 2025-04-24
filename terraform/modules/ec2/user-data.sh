@@ -50,7 +50,7 @@ wait_for_container() {
 # Initial setup and packages
 log "Starting initial setup..."
 apt-get update
-apt-get install -y awscli jq apt-transport-https ca-certificates curl gnupg lsb-release htop
+apt-get install -y awscli jq apt-transport-https ca-certificates curl gnupg lsb-release htop collectd
 log "Installed basic packages"
 
 # Setup status command
@@ -115,7 +115,293 @@ echo "alias status='/usr/local/bin/status'" >> /etc/profile.d/iykonect-welcome.s
 
 # Get instance region from metadata service
 AWS_REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/[a-z]$//')
-log "Detected AWS region: ${AWS_REGION}"
+INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+log "Detected AWS region: ${AWS_REGION}, Instance ID: ${INSTANCE_ID}"
+
+# Install CloudWatch agent
+log "Installing CloudWatch agent..."
+wget https://amazoncloudwatch-agent.s3.amazonaws.com/ubuntu/amd64/latest/amazon-cloudwatch-agent.deb
+dpkg -i -E ./amazon-cloudwatch-agent.deb
+rm ./amazon-cloudwatch-agent.deb
+
+# Configure CloudWatch agent
+log "Configuring CloudWatch agent..."
+mkdir -p /opt/aws/amazon-cloudwatch-agent/etc
+cat << 'EOF' > /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+{
+  "agent": {
+    "metrics_collection_interval": 60,
+    "run_as_user": "root"
+  },
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/var/log/user-data.log",
+            "log_group_name": "iykonect-user-data-logs",
+            "log_stream_name": "{instance_id}"
+          },
+          {
+            "file_path": "/var/log/syslog",
+            "log_group_name": "iykonect-system-logs",
+            "log_stream_name": "{instance_id}"
+          },
+          {
+            "file_path": "/var/log/docker.log",
+            "log_group_name": "iykonect-docker-logs",
+            "log_stream_name": "{instance_id}"
+          }
+        ]
+      }
+    }
+  },
+  "metrics": {
+    "namespace": "IYKonect/EC2",
+    "metrics_collected": {
+      "cpu": {
+        "resources": [
+          "*"
+        ],
+        "measurement": [
+          "usage_active",
+          "usage_system",
+          "usage_user",
+          "usage_idle"
+        ],
+        "metrics_collection_interval": 60
+      },
+      "mem": {
+        "measurement": [
+          "used_percent",
+          "used",
+          "total"
+        ],
+        "metrics_collection_interval": 60
+      },
+      "swap": {
+        "measurement": [
+          "used",
+          "free",
+          "used_percent"
+        ]
+      },
+      "disk": {
+        "resources": [
+          "/"
+        ],
+        "measurement": [
+          "used_percent",
+          "inodes_used_percent",
+          "used",
+          "total"
+        ],
+        "metrics_collection_interval": 60
+      },
+      "diskio": {
+        "resources": [
+          "*"
+        ],
+        "measurement": [
+          "reads",
+          "writes",
+          "read_bytes",
+          "write_bytes"
+        ],
+        "metrics_collection_interval": 60
+      },
+      "net": {
+        "resources": [
+          "*"
+        ],
+        "measurement": [
+          "bytes_sent",
+          "bytes_recv",
+          "packets_sent",
+          "packets_recv"
+        ],
+        "metrics_collection_interval": 60
+      },
+      "processes": {
+        "measurement": [
+          "running",
+          "blocked",
+          "zombie"
+        ]
+      },
+      "docker": {
+        "metrics_collection_interval": 60,
+        "measurement": [
+          "container_cpu_usage_percent",
+          "container_memory_usage_percent",
+          "container_memory_usage",
+          "network_io_usage"
+        ]
+      }
+    }
+  }
+}
+EOF
+
+# Create CloudWatch Dashboard
+log "Creating CloudWatch dashboard..."
+DASHBOARD_NAME="IYKonect-Dashboard-${INSTANCE_ID}"
+DASHBOARD_BODY=$(cat << EOF
+{
+  "widgets": [
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 0,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          ["IYKonect/EC2", "cpu_usage_active", "host", "${INSTANCE_ID}", {"stat": "Average"}],
+          ["...", "cpu_usage_system", ".", ".", {"stat": "Average"}],
+          ["...", "cpu_usage_user", ".", ".", {"stat": "Average"}]
+        ],
+        "period": 60,
+        "title": "CPU Usage",
+        "region": "${AWS_REGION}",
+        "view": "timeSeries",
+        "stacked": false
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 0,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          ["IYKonect/EC2", "mem_used_percent", "host", "${INSTANCE_ID}", {"stat": "Average"}]
+        ],
+        "period": 60,
+        "title": "Memory Usage",
+        "region": "${AWS_REGION}",
+        "view": "timeSeries",
+        "stacked": false,
+        "yAxis": {
+          "left": {
+            "min": 0,
+            "max": 100
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 6,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          ["IYKonect/EC2", "disk_used_percent", "host", "${INSTANCE_ID}", "path", "/", {"stat": "Average"}]
+        ],
+        "period": 60,
+        "title": "Disk Usage",
+        "region": "${AWS_REGION}",
+        "view": "timeSeries",
+        "stacked": false,
+        "yAxis": {
+          "left": {
+            "min": 0,
+            "max": 100
+          }
+        }
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 6,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          ["IYKonect/EC2", "net_bytes_sent", "host", "${INSTANCE_ID}", "interface", "eth0", {"stat": "Sum"}],
+          ["...", "net_bytes_recv", ".", ".", ".", ".", {"stat": "Sum"}]
+        ],
+        "period": 60,
+        "title": "Network Traffic",
+        "region": "${AWS_REGION}",
+        "view": "timeSeries",
+        "stacked": false
+      }
+    },
+    {
+      "type": "metric",
+      "x": 0,
+      "y": 12,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          ["IYKonect/EC2", "container_cpu_usage_percent", "host", "${INSTANCE_ID}", "container_name", "api", {"stat": "Average"}],
+          ["...", ".", ".", ".", ".", "react-app", {"stat": "Average"}]
+        ],
+        "period": 60,
+        "title": "Container CPU Usage",
+        "region": "${AWS_REGION}",
+        "view": "timeSeries",
+        "stacked": false
+      }
+    },
+    {
+      "type": "metric",
+      "x": 12,
+      "y": 12,
+      "width": 12,
+      "height": 6,
+      "properties": {
+        "metrics": [
+          ["IYKonect/EC2", "container_memory_usage_percent", "host", "${INSTANCE_ID}", "container_name", "api", {"stat": "Average"}],
+          ["...", ".", ".", ".", ".", "react-app", {"stat": "Average"}]
+        ],
+        "period": 60,
+        "title": "Container Memory Usage",
+        "region": "${AWS_REGION}",
+        "view": "timeSeries",
+        "stacked": false,
+        "yAxis": {
+          "left": {
+            "min": 0,
+            "max": 100
+          }
+        }
+      }
+    },
+    {
+      "type": "log",
+      "x": 0,
+      "y": 18,
+      "width": 24,
+      "height": 6,
+      "properties": {
+        "query": "SOURCE 'iykonect-user-data-logs' | fields @timestamp, @message\n| sort @timestamp desc\n| limit 100",
+        "region": "${AWS_REGION}",
+        "title": "User Data Logs",
+        "view": "table"
+      }
+    }
+  ]
+}
+EOF
+)
+
+# Start CloudWatch agent
+log "Starting CloudWatch agent..."
+/opt/aws/amazon-cloudwatch-agent/bin/amazon-cloudwatch-agent-ctl -a fetch-config -m ec2 -s -c file:/opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+systemctl enable amazon-cloudwatch-agent
+systemctl start amazon-cloudwatch-agent
+
+# Create CloudWatch Dashboard using AWS CLI
+log "Creating CloudWatch Dashboard using AWS CLI..."
+aws cloudwatch put-dashboard --dashboard-name "${DASHBOARD_NAME}" --dashboard-body "${DASHBOARD_BODY}" --region ${AWS_REGION}
+log "CloudWatch Dashboard URL: https://${AWS_REGION}.console.aws.amazon.com/cloudwatch/home?region=${AWS_REGION}#dashboards:name=${DASHBOARD_NAME}"
 
 # Fetch secrets from AWS Secrets Manager and create environment files
 log "Fetching secrets from AWS Secrets Manager..."
