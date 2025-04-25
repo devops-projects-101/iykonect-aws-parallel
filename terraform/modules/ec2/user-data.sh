@@ -250,6 +250,10 @@ mkdir -p /opt/iykonect/config
 touch /opt/iykonect/env/app.env
 chmod 600 /opt/iykonect/env/app.env
 
+# Create list of variables to be explicitly defined in the script (not extracted from secrets)
+log "Setting up list of variables to be explicitly defined in the script"
+declare -a EXPLICIT_VARS=("API_ENDPOINT" "REACT_APP_BASE_URL" "AppSettings__DomainBaseUrl")
+
 # Get list of secrets
 SECRETS_LIST=$(aws secretsmanager list-secrets --region ${AWS_REGION} --query "SecretList[].Name" --output text)
 log "Found secrets: ${SECRETS_LIST}"
@@ -265,6 +269,12 @@ for FULL_SECRET_NAME in ${SECRETS_LIST}; do
   
   # Skip excluded secrets
   if [[ "$SECRET_VAR_NAME" == "QA" || "$SECRET_VAR_NAME" == "Production" ]]; then
+    continue
+  fi
+  
+  # Skip variables that will be explicitly defined
+  if [[ " ${EXPLICIT_VARS[@]} " =~ " ${SECRET_VAR_NAME} " ]]; then
+    log "Skipping secret ${FULL_SECRET_NAME} as it will be explicitly defined"
     continue
   fi
   
@@ -289,8 +299,14 @@ for FULL_SECRET_NAME in ${SECRETS_LIST}; do
   fi
 done
 
-# Add API endpoint
+# Explicitly define required environment variables
+log "Explicitly defining required environment variables"
 echo "API_ENDPOINT=http://${PUBLIC_IP}:8000" >> /opt/iykonect/env/app.env
+echo "REACT_APP_BASE_URL=http://${PUBLIC_IP}:8000" >> /opt/iykonect/env/app.env
+echo "AppSettings__DomainBaseUrl=http://${PUBLIC_IP}:3000" >> /opt/iykonect/env/app.env
+
+# Remove duplicate entries (ensuring our explicit definitions take precedence)
+log "Removing duplicate entries from environment file (explicit definitions take precedence)"
 awk -F '=' '!seen[$1]++' /opt/iykonect/env/app.env > /tmp/env.tmp && mv /tmp/env.tmp /opt/iykonect/env/app.env
 
 # Install Docker
