@@ -154,6 +154,38 @@ jobs:
         # Apply all changes including new EC2
         terraform apply -auto-approve
 
+    - name: Generate Infrastructure Diagram
+      if: |
+        (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'create_infra')
+      run: |
+        # Create directory for rover output
+        mkdir -p rover-output
+
+        # Run Rover in Docker container
+        docker run --rm \
+          -v $(pwd):/workspace \
+          -w /workspace \
+          im2nguyen/rover:latest \
+          rover -genImage -standalone -workingDir=.
+
+        # Move to parent directory (for S3 upload step)
+        ls -la rover-output
+
+    - name: Upload Diagram to S3
+      if: |
+        (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'create_infra')
+      run: |
+        # Create a timestamped directory for this run
+        TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+        DIAGRAM_DIR="terraform-diagram-${TIMESTAMP}"
+        
+        # Upload all generated diagram files to S3 bucket
+        aws s3 cp rover-output/ s3://iykonect-aws-parallel/${DIAGRAM_DIR}/ --recursive
+        
+        echo "Infrastructure diagram uploaded to s3://iykonect-aws-parallel/${DIAGRAM_DIR}/"
+
     - name: Terraform Destroy
       if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy_infra'
       env:
