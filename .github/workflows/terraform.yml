@@ -71,11 +71,6 @@ jobs:
         # # Create a plan file
         # terraform plan -out=plan.out
         
-        # # Generate JSON from plan and ensure it's valid
-        # terraform show -json plan.out > plan.json
-        
-        # # Validate JSON format
-        # jq '.' plan.json > /dev/null || (echo "JSON validation failed - fixing format"; terraform show -json plan.out | jq '.' > plan.json)
         
         # Generate human-readable plan for PR comments
         terraform plan -no-color -input=false
