@@ -33,9 +33,12 @@ jobs:
         # Create output directory
         mkdir -p diagrams
         
-        # Generate diagram using Rover
+        # Generate diagram using Rover with correct flags
         cd terraform
-        rover --workingDir=. --output=../diagrams/infrastructure-diagram.svg
+        rover -genImage -workingDir=. -standalone
+        
+        # Copy generated files to diagrams directory
+        cp -r rover-output/* ../diagrams/
         cd ..
         
         echo "Diagram generation complete!"
@@ -51,14 +54,11 @@ jobs:
       run: |
         echo "Uploading diagram to S3 bucket..."
         
-        # Add timestamp to filename to prevent overwrites
+        # Add timestamp to folder name to prevent overwrites
         TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-        DIAGRAM_FILENAME="infrastructure-diagram-${TIMESTAMP}.svg"
+        DIAGRAM_DIR="terraform-diagram-${TIMESTAMP}"
         
-        # Copy the file with the timestamped name
-        cp diagrams/infrastructure-diagram.svg "diagrams/${DIAGRAM_FILENAME}"
+        # Upload all generated diagram files to S3 bucket
+        aws s3 cp diagrams/ s3://iykonect-aws-parallel/${DIAGRAM_DIR}/ --recursive
         
-        # Create separate directory for diagrams in S3 bucket
-        aws s3 cp diagrams/ s3://iykonect-aws-parallel/diagrams/ --recursive
-        
-        echo "Diagram uploaded successfully to s3://iykonect-aws-parallel/diagrams/${DIAGRAM_FILENAME}"
+        echo "Diagrams uploaded successfully to s3://iykonect-aws-parallel/${DIAGRAM_DIR}/"
