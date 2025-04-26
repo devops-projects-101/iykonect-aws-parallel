@@ -65,7 +65,14 @@ jobs:
         TF_VAR_aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
         TF_VAR_aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         TF_VAR_aws_region: ${{ secrets.AWS_REGION }}
-      run: terraform plan -no-color -input=false
+      run: |
+        # Create a plan file for Rover to use
+                echo "Generating infrastructure diagram using Terraform plan..."
+        
+        # Create a plan file for Rover to use
+        terraform plan -out=plan.out
+        terraform show -json plan.out > plan.json        
+        terraform plan -no-color -input=false
       continue-on-error: true
 
     - name: Update Pull Request
@@ -123,19 +130,11 @@ jobs:
         (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
         (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'create_infra')
       run: |
-        echo "Generating infrastructure diagram using Terraform plan..."
-        
-        # Create a plan file for Rover to use
-        terraform plan -out=plan.out
-        terraform show -json plan.out > plan.json
         
         # Run Rover to generate only the diagram image
         docker run --rm \
           -v $(pwd):/workspace \
           -w /workspace \
-          -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
-          -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
-          -e AWS_REGION=us-east-1 \
           im2nguyen/rover:latest \
           rover -planJSONPath /workspace/plan.json -genImage
         
