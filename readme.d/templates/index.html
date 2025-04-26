@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IYKonect AWS Infrastructure</title>
+    <link rel="stylesheet" href="assets/styles.css">
+</head>
+<body>
+    <header>
+        <h1>IYKonect AWS Infrastructure</h1>
+        <p>Infrastructure Documentation for {{ENVIRONMENT}} Environment</p>
+        <p>Generated on {{GENERATION_TIME}}</p>
+    </header>
+
+    <main>
+        <section id="overview">
+            <h2>Infrastructure Overview</h2>
+            <p>This documentation provides an overview of the AWS infrastructure deployed for IYKonect.</p>
+            <p>Source: <a href="{{SOURCE_URL}}">{{SOURCE_URL}}</a></p>
+        </section>
+
+        <section id="endpoints">
+            <h2>Endpoints</h2>
+            <table>
+                <tr>
+                    <th>Service</th>
+                    <th>URL</th>
+                </tr>
+                <tr>
+                    <td>Web Application</td>
+                    <td><a href="https://{{WEB_URL}}">{{WEB_URL}}</a></td>
+                </tr>
+                <tr>
+                    <td>Load Balancer</td>
+                    <td><a href="http://{{ALB_ENDPOINT}}">{{ALB_ENDPOINT}}</a></td>
+                </tr>
+            </table>
+        </section>
+
+        <section id="resources">
+            <h2>AWS Resources</h2>
+            <table>
+                <tr>
+                    <th>Resource Type</th>
+                    <th>Name/ID</th>
+                </tr>
+                <tr>
+                    <td>ECS Cluster</td>
+                    <td>{{CLUSTER_NAME}}</td>
+                </tr>
+                <tr>
+                    <td>ECS Service</td>
+                    <td>{{SERVICE_NAME}}</td>
+                </tr>
+            </table>
+        </section>
+
+        <section id="diagram">
+            <h2>Infrastructure Diagram</h2>
+            <p>View the <a href="infrastructure.html">infrastructure diagram</a> for a visual representation of the AWS resources.</p>
+        </section>
+    </main>
+
+    <footer>
+        <p>Last updated: {{UPDATE_TIME}} | Build ID: {{BUILD_ID}}</p>
+    </footer>
+</body>
+</html>

@@ -51,45 +51,9 @@ jobs:
         aws s3api head-bucket --bucket iykonect-aws-parallel 2>/dev/null || \
         aws s3api create-bucket --bucket iykonect-aws-parallel --region us-east-1
 
-    # - name: Upload credentials to S3
-    #   run: |
-    #     # Create credentials file
-    #     cat << EOF > credentials.sh
-    #     export AWS_ACCESS_KEY_ID='${{ secrets.AWS_ACCESS_KEY_ID }}'
-    #     export AWS_SECRET_ACCESS_KEY='${{ secrets.AWS_SECRET_ACCESS_KEY }}'
-    #     export AWS_REGION='${{ secrets.AWS_REGION }}'
-    #     export AWS_DEFAULT_REGION='${{ secrets.AWS_REGION }}'
-    #     EOF
-
-    #     # Upload file
-    #     aws s3 cp credentials.sh s3://iykonect-aws-parallel/credentials.sh
-
-    #     # Verify upload
-    #     if ! aws s3api head-object --bucket iykonect-aws-parallel --key credentials.sh; then
-    #       echo "ERROR: Failed to verify credentials.sh in S3"
-    #       rm credentials.sh
-    #       exit 1
-    #     fi
-
-    #     # Validate content
-    #     aws s3 cp s3://iykonect-aws-parallel/credentials.sh credentials_verify.sh
-    #     if ! grep -q "AWS_ACCESS_KEY_ID" credentials_verify.sh; then
-    #       echo "ERROR: Credentials file content validation failed"
-    #       rm credentials.sh credentials_verify.sh
-    #       exit 1
-    #     fi
-
-    #     echo "Successfully uploaded and verified credentials file"
-    #     rm credentials.sh credentials_verify.sh
-
     - name: Terraform Init
       id: init
       run: terraform init
-
-    # - name: Terraform Format
-    #   id: fmt
-    #   run: terraform fmt -check
-    #   continue-on-error: true
 
     - name: Terraform Validate
       id: validate
@@ -159,32 +123,45 @@ jobs:
         (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
         (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'create_infra')
       run: |
-        # Create directory for rover output
-        mkdir -p rover-output
-
-        # Run Rover in Docker container
+        echo "Generating infrastructure diagram using Terraform plan..."
+        
+        # Create a plan file for Rover to use
+        terraform plan -out=plan.out
+        terraform show -json plan.out > plan.json
+        
+        # Run Rover to generate only the diagram image
         docker run --rm \
           -v $(pwd):/workspace \
           -w /workspace \
+          -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
+          -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
+          -e AWS_REGION=us-east-1 \
           im2nguyen/rover:latest \
-          rover -genImage -standalone -workingDir=.
-
-        # Move to parent directory (for S3 upload step)
-        ls -la rover-output
+          rover -planJSONPath /workspace/plan.json -genImage
+        
+        # Ensure the output directory exists
+        mkdir -p diagram-output
+        
+        # Move the diagram file to our output directory
+        cp rover-output/diagram.svg diagram-output/ || echo "No diagram.svg found"
+        cp rover-output/*.svg diagram-output/ || echo "No SVG files found"
 
     - name: Upload Diagram to S3
       if: |
         (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
         (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'create_infra')
       run: |
-        # Create a timestamped directory for this run
+        # Create a timestamped filename for this run
         TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-        DIAGRAM_DIR="terraform-diagram-${TIMESTAMP}"
+        DIAGRAM_FILENAME="infrastructure-diagram-${TIMESTAMP}.svg"
         
-        # Upload all generated diagram files to S3 bucket
-        aws s3 cp rover-output/ s3://iykonect-aws-parallel/${DIAGRAM_DIR}/ --recursive
+        # Rename the diagram file
+        cp diagram-output/diagram.svg "diagram-output/${DIAGRAM_FILENAME}" || echo "No diagram.svg to rename"
         
-        echo "Infrastructure diagram uploaded to s3://iykonect-aws-parallel/${DIAGRAM_DIR}/"
+        # Upload diagram file to S3 bucket
+        aws s3 cp diagram-output/ s3://iykonect-aws-parallel/diagrams/ --recursive
+        
+        echo "Infrastructure diagram uploaded to s3://iykonect-aws-parallel/diagrams/${DIAGRAM_FILENAME}"
 
     - name: Terraform Destroy
       if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy_infra'

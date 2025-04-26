@@ -1,82 +1,82 @@
-name: 'Terraform Diagram Generation'
+# name: 'Terraform Diagram Generation'
 
-on:
-  push:
-    branches:
-      - main
-  pull_request:
-  workflow_dispatch:
+# on:
+#   push:
+#     branches:
+#       - main
+#   pull_request:
+#   workflow_dispatch:
 
-permissions:
-  contents: read
+# permissions:
+#   contents: read
 
-jobs:
-  generate-diagram:
-    name: 'Generate Terraform Diagram'
-    runs-on: ubuntu-latest
-    container:
-      image: im2nguyen/rover:latest
-      options: --entrypoint=""
+# jobs:
+#   generate-diagram:
+#     name: 'Generate Terraform Diagram'
+#     runs-on: ubuntu-latest
+#     container:
+#       image: im2nguyen/rover:latest
+#       options: --entrypoint=""
     
-    steps:
-    - name: Checkout
-      uses: actions/checkout@v3
+#     steps:
+#     - name: Checkout
+#       uses: actions/checkout@v3
     
-    - name: Setup Environment
-      run: |
-        apk add --no-cache jq curl gettext coreutils sed aws-cli
+#     - name: Setup Environment
+#       run: |
+#         apk add --no-cache jq curl gettext coreutils sed aws-cli
     
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v2
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: us-east-1
+#     - name: Configure AWS credentials
+#       uses: aws-actions/configure-aws-credentials@v2
+#       with:
+#         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+#         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#         aws-region: us-east-1
     
-    - name: Configure Terraform for offline mode
-      run: |
-        echo "Setting up terraform configuration for offline diagramming..."
+#     - name: Configure Terraform for offline mode
+#       run: |
+#         echo "Setting up terraform configuration for offline diagramming..."
         
-        # Create a local backend configuration to avoid needing S3 access
-        cd terraform
-        cat > override.tf << EOF
-        terraform {
-          backend "local" {}
-        }
-        EOF
-        cd ..
+#         # Create a local backend configuration to avoid needing S3 access
+#         cd terraform
+#         cat > override.tf << EOF
+#         terraform {
+#           backend "local" {}
+#         }
+#         EOF
+#         cd ..
     
-    - name: Generate Diagram
-      run: |
-        echo "Generating infrastructure diagram with Rover..."
+#     - name: Generate Diagram
+#       run: |
+#         echo "Generating infrastructure diagram with Rover..."
         
-        # Create output directory
-        mkdir -p diagrams
+#         # Create output directory
+#         mkdir -p diagrams
         
-        # Set AWS credentials as environment variables for Terraform/Rover
-        export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-        export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        export AWS_REGION=us-east-1
+#         # Set AWS credentials as environment variables for Terraform/Rover
+#         export AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+#         export AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+#         export AWS_REGION=us-east-1
         
-        # Generate diagram using Rover with correct flags
-        cd terraform
-        rover -genImage -workingDir=. -standalone
+#         # Generate diagram using Rover with correct flags
+#         cd terraform
+#         rover -genImage -workingDir=. -standalone
         
-        # Copy generated files to diagrams directory
-        cp -r rover-output/* ../diagrams/ || echo "No rover-output directory found"
-        cd ..
+#         # Copy generated files to diagrams directory
+#         cp -r rover-output/* ../diagrams/ || echo "No rover-output directory found"
+#         cd ..
         
-        echo "Diagram generation complete!"
+#         echo "Diagram generation complete!"
     
-    - name: Upload diagram to S3
-      run: |
-        echo "Uploading diagram to S3 bucket..."
+#     - name: Upload diagram to S3
+#       run: |
+#         echo "Uploading diagram to S3 bucket..."
         
-        # Add timestamp to folder name to prevent overwrites
-        TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-        DIAGRAM_DIR="terraform-diagram-${TIMESTAMP}"
+#         # Add timestamp to folder name to prevent overwrites
+#         TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+#         DIAGRAM_DIR="terraform-diagram-${TIMESTAMP}"
         
-        # Upload all generated diagram files to S3 bucket
-        aws s3 cp diagrams/ s3://iykonect-aws-parallel/${DIAGRAM_DIR}/ --recursive
+#         # Upload all generated diagram files to S3 bucket
+#         aws s3 cp diagrams/ s3://iykonect-aws-parallel/${DIAGRAM_DIR}/ --recursive
         
-        echo "Diagrams uploaded successfully to s3://iykonect-aws-parallel/${DIAGRAM_DIR}/"
+#         echo "Diagrams uploaded successfully to s3://iykonect-aws-parallel/${DIAGRAM_DIR}/"
