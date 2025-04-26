@@ -1,4 +1,4 @@
-name: 'Documentation'
+name: 'Terraform Diagram Generation'
 
 on:
   push:
@@ -8,13 +8,11 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
-  pages: write
-  id-token: write
+  contents: read
 
 jobs:
-  documentation:
-    name: 'Generate Documentation'
+  generate-diagram:
+    name: 'Generate Terraform Diagram'
     runs-on: ubuntu-latest
     container:
       image: im2nguyen/rover:latest
@@ -26,33 +24,41 @@ jobs:
     
     - name: Setup Environment
       run: |
-        apk add --no-cache jq curl gettext coreutils sed
+        apk add --no-cache jq curl gettext coreutils sed aws-cli
     
-    - name: Generate Documentation
+    - name: Generate Diagram
       run: |
-        echo "Project namespace: ${{ github.repository_owner }}"
-        echo "Project name: ${{ github.event.repository.name }}"
-        echo "Pages URL will be: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+        echo "Generating infrastructure diagram with Rover..."
         
-        mkdir -p readme.d
-        chmod +x ./readme.d/generate-docs.sh
-        ./readme.d/generate-docs.sh
-      env:
-        GITHUB_REPOSITORY_OWNER: ${{ github.repository_owner }}
-        GITHUB_REPOSITORY_NAME: ${{ github.event.repository.name }}
+        # Create output directory
+        mkdir -p diagrams
+        
+        # Generate diagram using Rover
+        cd terraform
+        rover --workingDir=. --output=../diagrams/infrastructure-diagram.svg
+        cd ..
+        
+        echo "Diagram generation complete!"
     
-    - name: Setup Pages
-      uses: actions/configure-pages@v3
-    
-    - name: Upload Pages Artifact
-      uses: actions/upload-pages-artifact@v2
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
       with:
-        path: './public'
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: us-east-1
     
-    - name: Deploy to GitHub Pages
-      id: deployment
-      uses: actions/deploy-pages@v2
-    
-    - name: Documentation URL
+    - name: Upload diagram to S3
       run: |
-        echo "Documentation is available at: https://${{ github.repository_owner }}.github.io/${{ github.event.repository.name }}"
+        echo "Uploading diagram to S3 bucket..."
+        
+        # Add timestamp to filename to prevent overwrites
+        TIMESTAMP=$(date +%Y%m%d-%H%M%S)
+        DIAGRAM_FILENAME="infrastructure-diagram-${TIMESTAMP}.svg"
+        
+        # Copy the file with the timestamped name
+        cp diagrams/infrastructure-diagram.svg "diagrams/${DIAGRAM_FILENAME}"
+        
+        # Create separate directory for diagrams in S3 bucket
+        aws s3 cp diagrams/ s3://iykonect-aws-parallel/diagrams/ --recursive
+        
+        echo "Diagram uploaded successfully to s3://iykonect-aws-parallel/diagrams/${DIAGRAM_FILENAME}"
