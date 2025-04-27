@@ -126,50 +126,6 @@ jobs:
         # Apply all changes including new EC2
         terraform apply -auto-approve
 
-    - name: Generate Infrastructure Diagram
-      if: |
-        (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
-        (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'create_infra')
-      run: |
-        echo "Generating infrastructure diagram using the existing Terraform plan JSON..."
-        
-        # Debug - check file content
-        echo "First few lines of the JSON file:"
-        head -n 10 plan.json || echo "Failed to read plan.json"
-        
-        # Validate the JSON file
-        jq '.' plan.json > /dev/null || (echo "Invalid JSON plan - attempting to fix"; terraform show -json plan.out | jq '.' > plan.json)
-        
-        # Run Rover with exact command format
-        docker run --rm \
-          -v $(pwd):/workspace \
-          -w /workspace \
-          -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} \
-          -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} \
-          -e AWS_REGION=us-east-1 \
-          im2nguyen/rover:latest \
-          rover -planJSONPath /workspace/plan.json -standalone true
-        
-        # Create output directory
-        mkdir -p diagram-output
-        
-        # Copy generated files
-        cp -r rover-output/* diagram-output/ || echo "No rover-output directory found"
-        cp rover.zip diagram-output/ || echo "No rover.zip found"
-
-    - name: Upload Diagram to S3
-      if: |
-        (github.ref == 'refs/heads/main' && github.event_name == 'push') ||
-        (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'create_infra')
-      run: |
-        # Create a timestamped directory name for this run
-        TIMESTAMP=$(date +%Y%m%d-%H%M%S)
-        DIAGRAM_DIR="terraform-diagram-${TIMESTAMP}"
-        
-        # Upload all generated diagram files to S3 bucket
-        aws s3 cp diagram-output/ s3://iykonect-aws-parallel/diagrams/${DIAGRAM_DIR}/ --recursive
-        
-        echo "Infrastructure diagram uploaded to s3://iykonect-aws-parallel/diagrams/${DIAGRAM_DIR}/"
 
     - name: Terraform Destroy
       if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy_infra'
