@@ -3,17 +3,17 @@ resource "aws_vpc" "main" {
   enable_dns_hostnames = true
   enable_dns_support   = true
 
-  tags = {
+  tags = merge({
     Name = "${var.prefix}-vpc"
-  }
+  }, var.tags)
 }
 
 resource "aws_internet_gateway" "main" {
   vpc_id = aws_vpc.main.id
 
-  tags = {
+  tags = merge({
     Name = "${var.prefix}-igw"
-  }
+  }, var.tags)
 }
 
 resource "aws_subnet" "public" {
@@ -21,9 +21,9 @@ resource "aws_subnet" "public" {
   cidr_block             = var.public_subnet_cidr
   map_public_ip_on_launch = true
 
-  tags = {
+  tags = merge({
     Name = "${var.prefix}-public-subnet"
-  }
+  }, var.tags)
 }
 
 resource "aws_route_table" "public" {
@@ -34,9 +34,9 @@ resource "aws_route_table" "public" {
     gateway_id = aws_internet_gateway.main.id
   }
 
-  tags = {
+  tags = merge({
     Name = "${var.prefix}-public-rt"
-  }
+  }, var.tags)
 }
 
 resource "aws_route_table_association" "public" {

@@ -41,7 +41,7 @@ variable "timestamp" {
 }
 
 variable "tags" {
-  description = "Additional tags for the instance"
+  description = "Common tags to apply to all resources"
   type        = map(string)
   default     = {}
 }

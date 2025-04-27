@@ -59,7 +59,7 @@ resource "aws_security_group" "instance" {
     cidr_blocks = ["0.0.0.0/0"]
   }
 
-  tags = {
+  tags = merge({
     Name = "${var.prefix}-sg"
-  }
+  }, var.tags)
 }

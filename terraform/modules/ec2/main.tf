@@ -20,21 +20,19 @@ resource "aws_instance" "main" {
     iops                  = 3000
     throughput            = 125
     delete_on_termination = true
-    tags = {
+    tags = merge({
       Name = "${var.prefix}-root-volume"
-    }
+    }, var.tags)
   }
 
   vpc_security_group_ids = [aws_security_group.instance.id]
   user_data_base64       = base64gzip(file("${path.module}/user-data.sh"))
   iam_instance_profile   = aws_iam_instance_profile.ec2_profile.name
 
-  tags = {
+  tags = merge({
     Name        = "${var.prefix}-instance"
-    ManagedBy   = "terraform"
-    Project     = "parallel"
     LastUpdated = formatdate("YYYY-MM-DD-hh-mm", timestamp())
-  }
+  }, var.tags)
 
   lifecycle {
     create_before_destroy = true

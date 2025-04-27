@@ -13,6 +13,10 @@ resource "aws_iam_role" "ec2_role" {
       }
     ]
   })
+  
+  tags = merge({
+    Name = "${var.prefix}-ec2-role"
+  }, var.tags)
 }
 
 resource "aws_iam_role_policy" "s3_access" {
