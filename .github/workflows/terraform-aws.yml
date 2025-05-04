@@ -2,8 +2,6 @@ name: 'Iykons AWS Deploy'
 
 on:
   push:
-    branches:
-      - main
     paths:
       - 'terraform/**'
       - '.github/workflows/terraform-aws.yml'
