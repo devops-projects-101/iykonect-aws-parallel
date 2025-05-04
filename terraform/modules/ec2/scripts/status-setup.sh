@@ -34,7 +34,8 @@ docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 echo
 echo "🩺 CONTAINER HEALTH CHECK"
 echo "──────────────────"
-/usr/local/bin/check-container-health
+# Call the separate container health check script
+/opt/iykonect-aws-repo/terraform/modules/ec2/scripts/container-health-check.sh
 echo
 echo "🌐 APPLICATION URLs"
 echo "──────────────────"
@@ -77,5 +78,19 @@ EOF
 
 chmod +x /usr/local/bin/detailed-logs
 echo "alias detailed-logs='/usr/local/bin/detailed-logs'" >> /etc/profile.d/iykonect-welcome.sh
+
+# Create a shortcut specifically for container health checks
+cat << EOF > /usr/local/bin/health-check
+#!/bin/bash
+clear
+echo "╔══════════════════════════════════════════════════╗"
+echo "║            CONTAINER HEALTH CHECKER              ║"
+echo "╚══════════════════════════════════════════════════╝"
+echo
+/opt/iykonect-aws-repo/terraform/modules/ec2/scripts/container-health-check.sh
+EOF
+
+chmod +x /usr/local/bin/health-check
+echo "alias health-check='/usr/local/bin/health-check'" >> /etc/profile.d/iykonect-welcome.sh
 
 log "Status command setup completed"

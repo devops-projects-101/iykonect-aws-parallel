@@ -47,3 +47,8 @@ output "grafana_endpoint" {
   description = "HTTP endpoint for Grafana"
   value       = module.ec2.grafana_endpoint
 }
+
+output "nginx_control_endpoint" {
+  description = "HTTP endpoint for Nginx control container"
+  value       = module.ec2.nginx_control_endpoint
+}

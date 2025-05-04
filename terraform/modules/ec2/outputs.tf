@@ -53,6 +53,11 @@ output "grafana_endpoint" {
   value = "http://${aws_instance.main.public_ip}:3100"
 }
 
+output "nginx_control_endpoint" {
+  description = "HTTP endpoint for the Nginx control container"
+  value = "http://${aws_instance.main.public_ip}:8008"
+}
+
 output "security_group_id" {
   value = aws_security_group.instance.id
 }
