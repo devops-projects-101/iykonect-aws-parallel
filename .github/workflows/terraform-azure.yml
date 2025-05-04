@@ -2,7 +2,14 @@ name: 'Iykons Azure Deploy'
 
 on:
   push:
+    branches:
+      - main
+    paths:
+      - 'terraform-azure/**'
+      - '.github/workflows/terraform-azure.yml'
   pull_request:
+    paths:
+      - 'terraform-azure/**'
   workflow_dispatch:
     inputs:
       action:
@@ -98,7 +105,7 @@ jobs:
       continue-on-error: true
 
     - name: Apply Azure Infrastructure Changes
-      if: github.event.inputs.action == 'create_azure_infra'
+      if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'create_azure_infra'
       env:
         TF_VAR_aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
         TF_VAR_aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
@@ -117,7 +124,7 @@ jobs:
         terraform apply -var-file=terraform.tfvars -auto-approve
 
     - name: Terraform Destroy Azure Infrastructure
-      if: github.event.inputs.action == 'destroy_azure_infra'
+      if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'destroy_azure_infra'
       env:
         TF_VAR_aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
         TF_VAR_aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
