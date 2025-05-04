@@ -17,20 +17,35 @@ output "api_endpoint" {
   value = "http://${aws_instance.main.public_ip}:8000"
 }
 
-output "prometheus_endpoint" {
+output "web-latest" {
+  value = "http://${aws_instance.main.public_ip}:5001"
+}
+
+output "signable-latest" {
+  value = "http://${aws_instance.main.public_ip}:8082"
+}
+
+output "email-server-latest" {
+  value = "http://${aws_instance.main.public_ip}:8025"
+}
+
+output "company-house-latest" {
+  value = "http://${aws_instance.main.public_ip}:8083"
+}
+
+
+output "redis-latest" {
+  value = "http://${aws_instance.main.public_ip}:6379"
+}
+
+
+output "prometheus-latest" {
   value = "http://${aws_instance.main.public_ip}:9090"
 }
 
-output "grafana_endpoint" {
+
+output "grafana-latest" {
   value = "http://${aws_instance.main.public_ip}:3100"
-}
-
-output "sonarqube_endpoint" {
-  value = "http://${aws_instance.main.public_ip}:9000"
-}
-
-output "renderer_endpoint" {
-  value = "http://${aws_instance.main.public_ip}:8081"
 }
 
 output "security_group_id" {
