@@ -42,15 +42,26 @@ jobs:
         aws-region: eu-west-1
         audience: sts.amazonaws.com
 
+    - name: Create S3 bucket for artifacts and state
+      run: |
+        aws s3api head-bucket --bucket iykonect-aws-parallel 2>/dev/null || \
+        aws s3api create-bucket --bucket iykonect-aws-parallel --region us-east-1
+
+    - name: Package and upload code to S3
+      if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'create_infra'
+      run: |
+        echo "Packaging repository content..."
+        cd $GITHUB_WORKSPACE
+        TIMESTAMP=$(date +%Y%m%d%H%M%S)
+        zip -r repo-content.zip . -x ".git/*" ".github/workflows/*"
+        aws s3 cp repo-content.zip s3://iykonect-aws-parallel/code-deploy/repo-content.zip
+        echo "DEPLOYMENT_TIMESTAMP=${TIMESTAMP}" >> $GITHUB_ENV
+        echo "Repository content uploaded to S3 bucket: s3://iykonect-aws-parallel/code-deploy/repo-content.zip"
+
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v2
       with:
         terraform_version: '1.6.6'
-
-    - name: Create S3 bucket for Terraform state
-      run: |
-        aws s3api head-bucket --bucket iykonect-aws-parallel 2>/dev/null || \
-        aws s3api create-bucket --bucket iykonect-aws-parallel --region us-east-1
 
     - name: Terraform Init
       id: init

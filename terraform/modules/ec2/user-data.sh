@@ -14,7 +14,7 @@ log() {
 
 # Initial setup
 log "Starting initial setup..."
-apt-get update && apt-get install -y awscli jq apt-transport-https ca-certificates curl gnupg lsb-release htop collectd git
+apt-get update && apt-get install -y awscli jq apt-transport-https ca-certificates curl gnupg lsb-release htop collectd unzip
 log "Package installation completed"
 
 # Get instance metadata
@@ -23,37 +23,34 @@ INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
 PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
 log "Instance info: Region=${AWS_REGION}, ID=${INSTANCE_ID}, IP=${PUBLIC_IP}"
 
-# Create directory for the repository
-log "Creating directory for repository..."
-mkdir -p /opt/iykonect-aws
+# Create directories for the repository
+log "Creating directories for repository..."
+mkdir -p /opt/iykonect-aws-repo
 
-# Clone the entire repository
-log "Cloning the entire repository..."
-git clone --depth=1 https://github.com/iykonect/iykonect-aws-parallel.git /opt/iykonect-aws-repo
+# Download code from S3 (using hardcoded bucket and path)
+log "Downloading code repository from S3..."
+aws s3 cp s3://iykonect-aws-parallel/code-deploy/repo-content.zip /tmp/repo-content.zip
 if [ $? -ne 0 ]; then
-    log "ERROR: Failed to clone repository. Creating local scripts..."
-    
-    # If git clone fails, create local scripts (this is just a fallback)
-    log "Creating local setup scripts as fallback..."
-    mkdir -p /opt/iykonect-aws/scripts
-    
-    # You could add fallback script content here if needed
-    # For now, we'll exit with an error since we're expecting the git clone to work
-    log "CRITICAL ERROR: Could not clone repository and no fallback scripts are defined."
+    log "ERROR: Failed to download repository content from S3."
     exit 1
-else
-    log "Repository cloned successfully to /opt/iykonect-aws-repo"
-    
-    # Set execute permissions on all shell scripts
-    log "Setting execute permissions on scripts..."
-    find /opt/iykonect-aws-repo -name "*.sh" -exec chmod +x {} \;
-    
-    # Create symlinks to the script directory for easier access
-    ln -sf /opt/iykonect-aws-repo/terraform/modules/ec2/scripts/cloudwatch-setup.sh /opt/iykonect-aws/
-    ln -sf /opt/iykonect-aws-repo/terraform/modules/ec2/scripts/secrets-setup.sh /opt/iykonect-aws/
-    ln -sf /opt/iykonect-aws-repo/terraform/modules/ec2/scripts/docker-setup.sh /opt/iykonect-aws/
-    ln -sf /opt/iykonect-aws-repo/terraform/modules/ec2/scripts/status-setup.sh /opt/iykonect-aws/
 fi
+
+# Extract repository content directly to /opt
+log "Extracting repository content to /opt/iykonect-aws-repo..."
+unzip -q /tmp/repo-content.zip -d /opt/iykonect-aws-repo
+rm -f /tmp/repo-content.zip
+log "Repository content extracted successfully"
+
+# Set execute permissions on all shell scripts
+log "Setting execute permissions on scripts..."
+find /opt/iykonect-aws-repo -name "*.sh" -exec chmod +x {} \;
+
+# Create symlinks to the script directory for easier access
+mkdir -p /opt/iykonect-aws
+ln -sf /opt/iykonect-aws-repo/terraform/modules/ec2/scripts/cloudwatch-setup.sh /opt/iykonect-aws/
+ln -sf /opt/iykonect-aws-repo/terraform/modules/ec2/scripts/secrets-setup.sh /opt/iykonect-aws/
+ln -sf /opt/iykonect-aws-repo/terraform/modules/ec2/scripts/docker-setup.sh /opt/iykonect-aws/
+ln -sf /opt/iykonect-aws-repo/terraform/modules/ec2/scripts/status-setup.sh /opt/iykonect-aws/
 
 # Execute status command setup
 log "Running status command setup..."
