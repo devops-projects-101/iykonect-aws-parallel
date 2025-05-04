@@ -54,10 +54,12 @@ resource "azurerm_linux_virtual_machine" "main" {
     version   = "latest"
   }
 
-  custom_data = base64encode(templatefile("${path.module}/user-data.sh", {
-    aws_access_key = var.aws_access_key
-    aws_secret_key = var.aws_secret_key
-    aws_region     = var.aws_region
-    azure_vm       = true
-  }))
+  custom_data = base64encode(
+    templatefile("${path.module}/cloud-init.yaml", {
+      admin_username = var.admin_username
+      aws_access_key = var.aws_access_key
+      aws_secret_key = var.aws_secret_key
+      aws_region     = var.aws_region
+    })
+  )
 }
