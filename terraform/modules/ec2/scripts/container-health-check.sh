@@ -3,6 +3,12 @@
 # Container health check script for status command
 # This script checks the health status of all deployed containers
 
+# Enable color output
+GREEN="\033[0;32m"
+RED="\033[0;31m"
+CYAN="\033[0;36m"
+NC="\033[0m" # No Color
+
 check_endpoint() {
     local endpoint="$1"
     local container="$2"
@@ -15,26 +21,26 @@ check_endpoint() {
     
     status=$(docker inspect --format='{{.State.Status}}' "$container" 2>/dev/null)
     if [ $? -ne 0 ]; then
-        printf "[\e[31mNOT FOUND\e[0m]"
+        printf "[${RED}NOT FOUND${NC}]"
         health_status=1
     elif [ "$status" != "running" ]; then
-        printf "[\e[31m$status\e[0m]"
+        printf "[${RED}$status${NC}]"
         health_status=1
     else
         # Show port information
         if [ -n "$port" ]; then
-            printf "[\e[32mRUNNING\e[0m] [\e[36mPORT: $port\e[0m]"
+            printf "[${GREEN}RUNNING${NC}] [${CYAN}PORT: $port${NC}]"
         else
-            printf "[\e[32mRUNNING\e[0m]"
+            printf "[${GREEN}RUNNING${NC}]"
         fi
 
         if [ -n "$endpoint" ]; then
             # Check if endpoint is responding
             response=$(curl -s -o /dev/null -w "%{http_code}" --request GET "$endpoint" --max-time $timeout 2>/dev/null)
             if [ $? -eq 0 ] && [ "$response" -ge 200 ] && [ "$response" -lt 400 ]; then
-                printf " [\e[32mENDPOINT OK\e[0m]"
+                printf " [${GREEN}ENDPOINT OK${NC}]"
             else
-                printf " [\e[31mENDPOINT ERROR\e[0m]"
+                printf " [${RED}ENDPOINT ERROR${NC}]"
                 health_status=1
             fi
         fi
@@ -98,9 +104,9 @@ echo "----------------"
 for port in 8000 5001 8082 8025 8083 6379 9090 3100 8008; do
     printf "%-5s: " "$port"
     if check_port_access "$port"; then
-        echo "[\e[32mACCESSIBLE\e[0m]"
+        echo -e "[${GREEN}ACCESSIBLE${NC}]"
     else
-        echo "[\e[31mNOT ACCESSIBLE\e[0m]"
+        echo -e "[${RED}NOT ACCESSIBLE${NC}]"
         
         # Show container logs for the failed port
         container_id=$(docker ps -q --filter publish=$port)
