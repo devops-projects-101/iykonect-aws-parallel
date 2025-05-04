@@ -1,0 +1,24 @@
+# Azure credentials
+azure_subscription_id = "your-azure-subscription-id"
+azure_tenant_id       = "your-azure-tenant-id"
+azure_client_id       = "your-azure-client-id"
+azure_client_secret   = "your-azure-client-secret"
+
+# AWS credentials for ECR access
+aws_access_key = "your-aws-access-key"
+aws_secret_key = "your-aws-secret-key"
+aws_region     = "eu-west-1"
+
+# VM configuration
+prefix          = "iykonect-azure"
+location        = "West Europe"
+vm_size         = "Standard_B2s"
+admin_username  = "adminuser"
+desired_count   = 1
+
+# Default tags
+default_tags = {
+  ManagedBy   = "Terraform"
+  Project     = "iykonect"
+  Environment = "azure"
+}

@@ -1,9 +1,7 @@
-name: 'Iykons deploy'
+name: 'Iykons AWS Deploy'
 
 on:
   push:
-    branches:
-      - main
   pull_request:
   workflow_dispatch:
     inputs:
@@ -23,7 +21,7 @@ permissions:
 
 jobs:
   terraform:
-    name: 'Terraform'
+    name: 'Terraform AWS'
     runs-on: ubuntu-latest
 
     defaults:
@@ -48,7 +46,7 @@ jobs:
         aws s3api create-bucket --bucket iykonect-aws-parallel --region us-east-1
 
     - name: Package and upload code to S3
-      if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'create_infra'
+      if: (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'create_infra')
       run: |
         echo "Packaging repository content..."
         cd $GITHUB_WORKSPACE
@@ -90,6 +88,7 @@ jobs:
       with:
         github-token: ${{ secrets.GITHUB_TOKEN }}
         script: |
+          const output = `
           #### Terraform Validation 🤖\`${{ steps.validate.outcome }}\`
           #### Terraform Plan 📖\`${{ steps.plan.outcome }}\`
           
