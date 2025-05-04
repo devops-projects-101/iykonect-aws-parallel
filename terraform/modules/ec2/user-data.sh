@@ -14,7 +14,7 @@ log() {
 
 # Initial setup
 log "Starting initial setup..."
-apt-get update && apt-get install -y awscli jq apt-transport-https ca-certificates curl gnupg lsb-release htop collectd unzip
+apt-get update && apt-get install -y awscli jq apt-transport-https ca-certificates curl gnupg lsb-release htop collectd unzip cowsay
 log "Package installation completed"
 
 # Get instance metadata
