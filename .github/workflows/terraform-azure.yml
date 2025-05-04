@@ -28,6 +28,9 @@ jobs:
   terraform-azure:
     name: 'Terraform Azure'
     runs-on: ubuntu-latest
+    if: |
+      (github.event_name != 'workflow_dispatch') || 
+      (github.event_name == 'workflow_dispatch' && contains(fromJSON('["plan_azure_infra", "create_azure_infra", "destroy_azure_infra"]'), github.event.inputs.action))
 
     defaults:
       run:
