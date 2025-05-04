@@ -24,10 +24,10 @@ log "Package installation completed"
 
 # Set Azure-specific variables
 AZURE_VM="true"
-HOSTNAME=$(hostname)
+VM_HOSTNAME=$(hostname)
 PUBLIC_IP=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/publicIpAddress?api-version=2021-02-01&format=text")
 PRIVATE_IP=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/privateIpAddress?api-version=2021-02-01&format=text")
-log "Instance info: VM=${HOSTNAME}, Public IP=${PUBLIC_IP}, Private IP=${PRIVATE_IP}"
+log "Instance info: VM=${VM_HOSTNAME}, Public IP=${PUBLIC_IP}, Private IP=${PRIVATE_IP}"
 
 # Create directories for the repository
 log "Creating directories for repository..."
