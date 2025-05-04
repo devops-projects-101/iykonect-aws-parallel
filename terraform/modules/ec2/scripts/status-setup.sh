@@ -57,7 +57,7 @@ echo -e "  Nginx Control: http://${PUBLIC_IP}:8008"
 echo
 
 echo -e "${YELLOW}Type '${GREEN}status${YELLOW}' to get started with a full system overview.${NC}"
-echo -e "$(cowsay -f small "May the Force be with you!")"
+echo -e "$(cowsay  "May the Force be with you!")"
 echo
 EOF
 
