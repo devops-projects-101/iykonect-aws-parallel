@@ -11,7 +11,7 @@ terraform {
   }
   
   backend "azurerm" {
-    resource_group_name  = "tfstate"
+    resource_group_name  = "iykonect-azure-parallel"
     storage_account_name = "iykonecttfstate"
     container_name       = "tfstate"
     key                  = "azure-infra.terraform.tfstate"
@@ -19,7 +19,12 @@ terraform {
 }
 
 provider "azurerm" {
-  features {}
+  features {
+    resource_group {
+      prevent_deletion_if_contains_resources = false
+    }
+    # Keep features minimal to avoid configuration errors
+  }
   subscription_id = var.azure_subscription_id
   tenant_id       = var.azure_tenant_id
   client_id       = var.azure_client_id

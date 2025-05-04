@@ -4,6 +4,14 @@ resource "azurerm_resource_group" "main" {
   tags     = var.default_tags
 }
 
+# Create Network Watcher in the main resource group instead of letting Azure create NetworkWatcherRG
+resource "azurerm_network_watcher" "main" {
+  name                = "${var.prefix}-network-watcher"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.main.name
+  tags                = var.default_tags
+}
+
 module "virtual_network" {
   source              = "./modules/virtual_network"
   prefix              = var.prefix
