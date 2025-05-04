@@ -46,6 +46,7 @@ echo "Company House URL: http://${PUBLIC_IP}:8083"
 echo "Redis Port:        ${PUBLIC_IP}:6379"
 echo "Prometheus URL:    http://${PUBLIC_IP}:9090"
 echo "Grafana URL:       http://${PUBLIC_IP}:3100"
+echo "Nginx Control URL: http://${PUBLIC_IP}:8008"
 echo
 echo "👀 MONITORING"
 echo "────────────"

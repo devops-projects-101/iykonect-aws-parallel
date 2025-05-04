@@ -39,6 +39,13 @@ resource "aws_security_group" "instance" {
   }
 
   ingress {
+    from_port   = 8008
+    to_port     = 8008
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+  }
+
+  ingress {
     from_port   = 8025
     to_port     = 8025
     protocol    = "tcp"

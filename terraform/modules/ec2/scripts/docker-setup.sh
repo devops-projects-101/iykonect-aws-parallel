@@ -237,6 +237,15 @@ run_docker "docker run -d --network app-network --restart always --name grafana 
     -v /opt/iykonect/grafana:/var/lib/grafana \
     571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:grafana-latest" "grafana" || exit 1
 
+# Deploy Nginx container as a controlled image for health checks
+log "Deploying Nginx container..."
+if ! check_port 8008; then
+    log "ERROR: Port 8008 is not available"
+    exit 1
+fi
+run_docker "docker run -d --network app-network --restart always --name nginx-control -p 0.0.0.0:8008:80 \
+    nginx:latest" "nginx-control" || exit 1
+
 # Now that all containers are deployed, validate endpoints
 log "==============================================="
 log "Validating all service endpoints"
@@ -267,6 +276,9 @@ validate_endpoint "http://${PRIVATE_IP}:9090" || log "Prometheus validation fail
 # Validate Grafana endpoint
 validate_endpoint "http://${PRIVATE_IP}:3100" || log "Grafana validation failed but continuing"
 
+# Validate Nginx control endpoint
+validate_endpoint "http://${PRIVATE_IP}:8008" || log "Nginx control validation failed but continuing"
+
 # Create health check script that will be used by status command
 log "Creating health check script for status command..."
 cat << 'EOF' > /usr/local/bin/check-container-health
@@ -275,6 +287,7 @@ cat << 'EOF' > /usr/local/bin/check-container-health
 check_endpoint() {
     local endpoint="$1"
     local container="$2"
+    local port="$3"
     local timeout=2
 
     # Print container status first
@@ -291,51 +304,92 @@ check_endpoint() {
         return 1
     fi
 
+    # Show port information
+    if [ -n "$port" ]; then
+        printf "[\e[32mRUNNING\e[0m] [\e[36mPORT: $port\e[0m]"
+    else
+        printf "[\e[32mRUNNING\e[0m]"
+    fi
+
     if [ -n "$endpoint" ]; then
         # Check if endpoint is responding
         response=$(curl -s -o /dev/null -w "%{http_code}" --request GET "$endpoint" --max-time $timeout 2>/dev/null)
         if [ $? -eq 0 ] && [ "$response" -ge 200 ] && [ "$response" -lt 400 ]; then
-            printf "[\e[32mRUNNING\e[0m] [\e[32mENDPOINT OK\e[0m]"
+            printf " [\e[32mENDPOINT OK\e[0m]"
             return 0
         else
-            printf "[\e[32mRUNNING\e[0m] [\e[31mENDPOINT ERROR\e[0m]"
+            printf " [\e[31mENDPOINT ERROR\e[0m]"
             return 1
         fi
-    else
-        # Just check container status if no endpoint
-        printf "[\e[32mRUNNING\e[0m]"
+    fi
+    
+    echo ""
+    return 0
+}
+
+# Check port accessibility via netcat if available
+check_port_access() {
+    local port="$1"
+    local host="localhost"
+    
+    if command -v nc >/dev/null 2>&1; then
+        if nc -z -w2 $host $port >/dev/null 2>&1; then
+            return 0
+        else
+            return 1
+        fi
+    fi
+    
+    # Fallback to curl if netcat is not available
+    if curl -s "http://$host:$port" -m 1 >/dev/null 2>&1; then
         return 0
+    else
+        return 1
     fi
 }
 
 # Get instance IPs
 PRIVATE_IP=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
 
-echo "CONTAINER       STATUS          ENDPOINT"
-echo "--------------------------------------------"
-check_endpoint "http://${PRIVATE_IP}:8000" "api"
+echo "CONTAINER       STATUS              ENDPOINT"
+echo "-----------------------------------------------"
+check_endpoint "http://${PRIVATE_IP}:8000" "api" "8000"
 echo ""
 
-check_endpoint "http://${PRIVATE_IP}:5001" "web"
+check_endpoint "http://${PRIVATE_IP}:5001" "web" "5001"
 echo ""
 
-check_endpoint "http://${PRIVATE_IP}:8082" "signable"
+check_endpoint "http://${PRIVATE_IP}:8082" "signable" "8082"
 echo ""
 
-check_endpoint "http://${PRIVATE_IP}:8025" "email-server"
+check_endpoint "http://${PRIVATE_IP}:8025" "email-server" "8025"
 echo ""
 
-check_endpoint "http://${PRIVATE_IP}:8083" "company-house"
+check_endpoint "http://${PRIVATE_IP}:8083" "company-house" "8083"
 echo ""
 
-check_endpoint "" "redis"
+check_endpoint "" "redis" "6379"
 echo ""
 
-check_endpoint "http://${PRIVATE_IP}:9090" "prometheus"
+check_endpoint "http://${PRIVATE_IP}:9090" "prometheus" "9090"
 echo ""
 
-check_endpoint "http://${PRIVATE_IP}:3100" "grafana"
+check_endpoint "http://${PRIVATE_IP}:3100" "grafana" "3100"
 echo ""
+
+check_endpoint "http://${PRIVATE_IP}:8008" "nginx-control" "8008"
+echo ""
+
+echo "PORT ACCESS CHECK"
+echo "----------------"
+for port in 8000 5001 8082 8025 8083 6379 9090 3100 8008; do
+    printf "%-5s: " "$port"
+    if check_port_access "$port"; then
+        echo "[\e[32mACCESSIBLE\e[0m]"
+    else
+        echo "[\e[31mNOT ACCESSIBLE\e[0m]"
+    fi
+done
 EOF
 
 chmod +x /usr/local/bin/check-container-health
@@ -376,3 +430,4 @@ log "Company House URL: http://${PUBLIC_IP}:8083"
 log "Redis Port: ${PUBLIC_IP}:6379"
 log "Prometheus URL: http://${PUBLIC_IP}:9090"
 log "Grafana URL: http://${PUBLIC_IP}:3100"
+log "Nginx Control URL: http://${PUBLIC_IP}:8008"
