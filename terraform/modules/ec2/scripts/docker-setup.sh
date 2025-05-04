@@ -173,7 +173,8 @@ log "==============================================="
 log "Docker setup and deployment completed"
 log "==============================================="
 
-# Print application URLs
+# Final status
+log "=== Deployment Complete ==="
 log "API URL: http://${PUBLIC_IP}:8000"
 log "Web URL: http://${PUBLIC_IP}:5001"
 log "Signable URL: http://${PUBLIC_IP}:8082"

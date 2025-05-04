@@ -14,37 +14,42 @@ output "public_ip" {
 }
 
 output "api_endpoint" {
+  description = "HTTP endpoint for the API service"
   value = "http://${aws_instance.main.public_ip}:8000"
 }
 
-output "web-latest" {
+output "web_endpoint" {
+  description = "HTTP endpoint for the Web service"
   value = "http://${aws_instance.main.public_ip}:5001"
 }
 
-output "signable-latest" {
+output "signable_endpoint" {
+  description = "HTTP endpoint for the Signable service"
   value = "http://${aws_instance.main.public_ip}:8082"
 }
 
-output "email-server-latest" {
+output "email_server_endpoint" {
+  description = "HTTP endpoint for the Email Server service"
   value = "http://${aws_instance.main.public_ip}:8025"
 }
 
-output "company-house-latest" {
+output "company_house_endpoint" {
+  description = "HTTP endpoint for the Company House service"
   value = "http://${aws_instance.main.public_ip}:8083"
 }
 
-
-output "redis-latest" {
-  value = "http://${aws_instance.main.public_ip}:6379"
+output "redis_endpoint" {
+  description = "Endpoint for the Redis service"
+  value = "${aws_instance.main.public_ip}:6379" # Redis doesn't typically use http
 }
 
-
-output "prometheus-latest" {
+output "prometheus_endpoint" {
+  description = "HTTP endpoint for the Prometheus service"
   value = "http://${aws_instance.main.public_ip}:9090"
 }
 
-
-output "grafana-latest" {
+output "grafana_endpoint" {
+  description = "HTTP endpoint for the Grafana service"
   value = "http://${aws_instance.main.public_ip}:3100"
 }
 

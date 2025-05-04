@@ -7,8 +7,13 @@ log() {
 
 log "Setting up system status command..."
 
+# Get instance metadata
+PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
+AWS_REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/availability-zone | sed 's/[a-z]$//')
+INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
+
 # Setup status command
-cat << 'EOF' > /usr/local/bin/status
+cat << EOF > /usr/local/bin/status
 #!/bin/bash
 clear
 echo "╔══════════════════════════════════════════════════╗"
@@ -26,6 +31,21 @@ echo
 echo "🐳 DOCKER CONTAINERS"
 echo "──────────────"
 docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+echo
+echo "🌐 APPLICATION URLs"
+echo "──────────────────"
+echo "API URL:           http://${PUBLIC_IP}:8000"
+echo "Web URL:           http://${PUBLIC_IP}:5001"
+echo "Signable URL:      http://${PUBLIC_IP}:8082"
+echo "Email Server URL:  http://${PUBLIC_IP}:8025"
+echo "Company House URL: http://${PUBLIC_IP}:8083"
+echo "Redis Port:        ${PUBLIC_IP}:6379"
+echo "Prometheus URL:    http://${PUBLIC_IP}:9090"
+echo "Grafana URL:       http://${PUBLIC_IP}:3100"
+echo
+echo "👀 MONITORING"
+echo "────────────"
+echo "CloudWatch Dashboard: https://${AWS_REGION}.console.aws.amazon.com/cloudwatch/home?region=${AWS_REGION}#dashboards:name=IYKonect-Dashboard-${INSTANCE_ID}"
 echo
 echo "📝 RECENT LOGS"
 echo "──────────────"

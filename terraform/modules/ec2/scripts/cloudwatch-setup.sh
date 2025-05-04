@@ -170,3 +170,7 @@ EOF
 
 aws cloudwatch put-dashboard --dashboard-name "${DASHBOARD_NAME}" --dashboard-body file:///tmp/dashboard.json --region ${AWS_REGION}
 log "CloudWatch dashboard created: ${DASHBOARD_NAME}"
+
+# Final status
+log "=== CloudWatch Setup Complete ==="
+log "Dashboard: https://${AWS_REGION}.console.aws.amazon.com/cloudwatch/home?region=${AWS_REGION}#dashboards:name=IYKonect-Dashboard-${INSTANCE_ID}"

@@ -13,6 +13,31 @@ output "api_endpoint" {
   value       = module.ec2.api_endpoint
 }
 
+output "web_endpoint" {
+  description = "HTTP endpoint for the Web service"
+  value       = module.ec2.web_endpoint
+}
+
+output "signable_endpoint" {
+  description = "HTTP endpoint for the Signable service"
+  value       = module.ec2.signable_endpoint
+}
+
+output "email_server_endpoint" {
+  description = "HTTP endpoint for the Email Server service"
+  value       = module.ec2.email_server_endpoint
+}
+
+output "company_house_endpoint" {
+  description = "HTTP endpoint for the Company House service"
+  value       = module.ec2.company_house_endpoint
+}
+
+output "redis_endpoint" {
+  description = "Endpoint for the Redis service"
+  value       = module.ec2.redis_endpoint
+}
+
 output "prometheus_endpoint" {
   description = "HTTP endpoint for Prometheus"
   value       = module.ec2.prometheus_endpoint
@@ -21,14 +46,4 @@ output "prometheus_endpoint" {
 output "grafana_endpoint" {
   description = "HTTP endpoint for Grafana"
   value       = module.ec2.grafana_endpoint
-}
-
-output "sonarqube_endpoint" {
-  description = "HTTP endpoint for SonarQube"
-  value       = module.ec2.sonarqube_endpoint
-}
-
-output "renderer_endpoint" {
-  description = "HTTP endpoint for Grafana renderer"
-  value       = module.ec2.renderer_endpoint
 }
