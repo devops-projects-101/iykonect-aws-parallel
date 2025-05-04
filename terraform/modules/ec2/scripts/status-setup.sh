@@ -32,6 +32,10 @@ echo "🐳 DOCKER CONTAINERS"
 echo "──────────────"
 docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
 echo
+echo "🩺 CONTAINER HEALTH CHECK"
+echo "──────────────────"
+/usr/local/bin/check-container-health
+echo
 echo "🌐 APPLICATION URLs"
 echo "──────────────────"
 echo "API URL:           http://${PUBLIC_IP}:8000"
@@ -49,10 +53,28 @@ echo "CloudWatch Dashboard: https://${AWS_REGION}.console.aws.amazon.com/cloudwa
 echo
 echo "📝 RECENT LOGS"
 echo "──────────────"
+echo "Last 10 lines of logs (use 'tail -n 200 /var/log/user-data.log' for more):"
 tail -n 10 /var/log/user-data.log
+
+# Additional command to show more logs
+echo
+echo "To view detailed logs (200 lines), type: tail -n 200 /var/log/user-data.log"
 EOF
 
 chmod +x /usr/local/bin/status
 echo "alias status='/usr/local/bin/status'" >> /etc/profile.d/iykonect-welcome.sh
+
+# Create a shortcut for viewing detailed logs
+cat << EOF > /usr/local/bin/detailed-logs
+#!/bin/bash
+echo "╔══════════════════════════════════════════════════╗"
+echo "║             DETAILED DEPLOYMENT LOGS             ║"
+echo "╚══════════════════════════════════════════════════╝"
+echo
+tail -n 200 /var/log/user-data.log
+EOF
+
+chmod +x /usr/local/bin/detailed-logs
+echo "alias detailed-logs='/usr/local/bin/detailed-logs'" >> /etc/profile.d/iykonect-welcome.sh
 
 log "Status command setup completed"

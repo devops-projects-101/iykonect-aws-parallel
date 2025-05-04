@@ -163,7 +163,6 @@ run_docker "docker run -d --network app-network --restart always --name api -p 0
     --env-file /opt/iykonect/env/app.env \
     -v /opt/iykonect/config:/app/config \
     571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:api-latest" "api" || exit 1
-validate_endpoint "http://${PRIVATE_IP}:8000" || log "API validation failed but continuing deployment"
 
 # Deploy Web container
 log "Deploying Web container..."
@@ -175,7 +174,6 @@ run_docker "docker run -d --network app-network --restart always --name web -p 0
     --env-file /opt/iykonect/env/app.env \
     -v /opt/iykonect/config:/app/config \
     571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:web-latest" "web" || exit 1
-validate_endpoint "http://${PRIVATE_IP}:5001" || log "Web validation failed but continuing deployment"
 
 # Deploy Signable container
 log "Deploying Signable container..."
@@ -187,7 +185,6 @@ run_docker "docker run -d --network app-network --restart always --name signable
     --env-file /opt/iykonect/env/app.env \
     -v /opt/iykonect/config:/app/config \
     571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:signable-latest" "signable" || exit 1
-validate_endpoint "http://${PRIVATE_IP}:8082" || log "Signable validation failed but continuing deployment"
 
 # Deploy Email Server container
 log "Deploying Email Server container..."
@@ -199,7 +196,6 @@ run_docker "docker run -d --network app-network --restart always --name email-se
     --env-file /opt/iykonect/env/app.env \
     -v /opt/iykonect/config:/app/config \
     571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:email-server-latest" "email-server" || exit 1
-validate_endpoint "http://${PRIVATE_IP}:8025" || log "Email server validation failed but continuing deployment"
 
 # Deploy Company House container
 log "Deploying Company House container..."
@@ -211,7 +207,6 @@ run_docker "docker run -d --network app-network --restart always --name company-
     --env-file /opt/iykonect/env/app.env \
     -v /opt/iykonect/config:/app/config \
     571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:company-house-latest" "company-house" || exit 1
-validate_endpoint "http://${PRIVATE_IP}:8083" || log "Company House validation failed but continuing deployment"
 
 # Deploy Redis container
 log "Deploying Redis container..."
@@ -231,7 +226,6 @@ fi
 run_docker "docker run -d --network app-network --restart always --name prometheus -p 0.0.0.0:9090:9090 \
     -v /opt/iykonect/prometheus:/etc/prometheus \
     571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:prometheus-latest" "prometheus" || exit 1
-validate_endpoint "http://${PRIVATE_IP}:9090" || log "Prometheus validation failed but continuing deployment"
 
 # Deploy Grafana container
 log "Deploying Grafana container..."
@@ -242,7 +236,109 @@ fi
 run_docker "docker run -d --network app-network --restart always --name grafana -p 0.0.0.0:3100:3100 \
     -v /opt/iykonect/grafana:/var/lib/grafana \
     571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:grafana-latest" "grafana" || exit 1
-validate_endpoint "http://${PRIVATE_IP}:3100" || log "Grafana validation failed but continuing deployment"
+
+# Now that all containers are deployed, validate endpoints
+log "==============================================="
+log "Validating all service endpoints"
+log "==============================================="
+
+# Wait a bit for all services to fully initialize
+log "Waiting 10 seconds for services to initialize before validation..."
+sleep 10
+
+# Validate API endpoint
+validate_endpoint "http://${PRIVATE_IP}:8000" || log "API validation failed but continuing"
+
+# Validate Web endpoint
+validate_endpoint "http://${PRIVATE_IP}:5001" || log "Web validation failed but continuing"
+
+# Validate Signable endpoint
+validate_endpoint "http://${PRIVATE_IP}:8082" || log "Signable validation failed but continuing"
+
+# Validate Email Server endpoint
+validate_endpoint "http://${PRIVATE_IP}:8025" || log "Email Server validation failed but continuing"
+
+# Validate Company House endpoint
+validate_endpoint "http://${PRIVATE_IP}:8083" || log "Company House validation failed but continuing"
+
+# Validate Prometheus endpoint
+validate_endpoint "http://${PRIVATE_IP}:9090" || log "Prometheus validation failed but continuing"
+
+# Validate Grafana endpoint
+validate_endpoint "http://${PRIVATE_IP}:3100" || log "Grafana validation failed but continuing"
+
+# Create health check script that will be used by status command
+log "Creating health check script for status command..."
+cat << 'EOF' > /usr/local/bin/check-container-health
+#!/bin/bash
+
+check_endpoint() {
+    local endpoint="$1"
+    local container="$2"
+    local timeout=2
+
+    # Print container status first
+    printf "%-15s" "$container"
+    
+    status=$(docker inspect --format='{{.State.Status}}' "$container" 2>/dev/null)
+    if [ $? -ne 0 ]; then
+        printf "[\e[31mNOT FOUND\e[0m]"
+        return 1
+    fi
+    
+    if [ "$status" != "running" ]; then
+        printf "[\e[31m$status\e[0m]"
+        return 1
+    fi
+
+    if [ -n "$endpoint" ]; then
+        # Check if endpoint is responding
+        response=$(curl -s -o /dev/null -w "%{http_code}" --request GET "$endpoint" --max-time $timeout 2>/dev/null)
+        if [ $? -eq 0 ] && [ "$response" -ge 200 ] && [ "$response" -lt 400 ]; then
+            printf "[\e[32mRUNNING\e[0m] [\e[32mENDPOINT OK\e[0m]"
+            return 0
+        else
+            printf "[\e[32mRUNNING\e[0m] [\e[31mENDPOINT ERROR\e[0m]"
+            return 1
+        fi
+    else
+        # Just check container status if no endpoint
+        printf "[\e[32mRUNNING\e[0m]"
+        return 0
+    fi
+}
+
+# Get instance IPs
+PRIVATE_IP=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
+
+echo "CONTAINER       STATUS          ENDPOINT"
+echo "--------------------------------------------"
+check_endpoint "http://${PRIVATE_IP}:8000" "api"
+echo ""
+
+check_endpoint "http://${PRIVATE_IP}:5001" "web"
+echo ""
+
+check_endpoint "http://${PRIVATE_IP}:8082" "signable"
+echo ""
+
+check_endpoint "http://${PRIVATE_IP}:8025" "email-server"
+echo ""
+
+check_endpoint "http://${PRIVATE_IP}:8083" "company-house"
+echo ""
+
+check_endpoint "" "redis"
+echo ""
+
+check_endpoint "http://${PRIVATE_IP}:9090" "prometheus"
+echo ""
+
+check_endpoint "http://${PRIVATE_IP}:3100" "grafana"
+echo ""
+EOF
+
+chmod +x /usr/local/bin/check-container-health
 
 # Display network configuration
 log "==============================================="
