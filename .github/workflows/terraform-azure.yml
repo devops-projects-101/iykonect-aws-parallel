@@ -2,12 +2,10 @@ name: 'Iykons Azure Deploy'
 
 on:
   push:
-    paths:
-      - 'terraform-azure/**'
-      - '.github/workflows/terraform-azure.yml'
+    branches:
+      - main
+      - 'feature/**'
   pull_request:
-    paths:
-      - 'terraform-azure/**'
   workflow_dispatch:
     inputs:
       action:
