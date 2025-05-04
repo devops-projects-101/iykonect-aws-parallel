@@ -52,3 +52,24 @@ output "nginx_control_endpoint" {
   description = "HTTP endpoint for Nginx control container"
   value       = module.ec2.nginx_control_endpoint
 }
+
+# Docker-related endpoints
+output "docker_registry_endpoint" {
+  description = "URL for Docker Registry if deployed"
+  value       = module.ec2.docker_registry_endpoint
+}
+
+output "docker_api_endpoint" {
+  description = "Docker API endpoint"
+  value       = module.ec2.docker_api_endpoint
+}
+
+output "docker_api_tls_endpoint" {
+  description = "Docker API TLS endpoint"
+  value       = module.ec2.docker_api_tls_endpoint
+}
+
+output "docker_container_urls" {
+  description = "Map of container names to their URLs"
+  value       = module.ec2.docker_container_urls
+}

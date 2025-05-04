@@ -22,3 +22,39 @@ output "ssh_command" {
   description = "SSH command to connect to the VM"
   value       = module.vm.ssh_command
 }
+
+# Docker URL outputs
+output "docker_registry_endpoint" {
+  description = "URL for Docker Registry if deployed"
+  value       = module.vm.docker_registry_endpoint
+}
+
+output "docker_api_endpoint" {
+  description = "Docker API endpoint"
+  value       = module.vm.docker_api_endpoint
+}
+
+output "docker_api_tls_endpoint" {
+  description = "Docker API TLS endpoint"
+  value       = module.vm.docker_api_tls_endpoint
+}
+
+output "docker_container_urls" {
+  description = "Map of container names to their URLs"
+  value       = module.vm.docker_container_urls
+}
+
+# Load balancer container URLs
+output "load_balancer_container_urls" {
+  description = "Map of container names to their load balancer URLs"
+  value = {
+    api           = "http://${module.load_balancer.public_ip_address}:8000"
+    web           = "http://${module.load_balancer.public_ip_address}:5001"
+    signable      = "http://${module.load_balancer.public_ip_address}:8082"
+    email_server  = "http://${module.load_balancer.public_ip_address}:8025"
+    company_house = "http://${module.load_balancer.public_ip_address}:8083"
+    prometheus    = "http://${module.load_balancer.public_ip_address}:9090"
+    grafana       = "http://${module.load_balancer.public_ip_address}:3100"
+    nginx_control = "http://${module.load_balancer.public_ip_address}:8008"
+  }
+}
