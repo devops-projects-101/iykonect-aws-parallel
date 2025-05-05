@@ -192,7 +192,7 @@ if ! check_port 8025; then
     log "ERROR: Port 8025 is not available"
     exit 1
 fi
-run_docker "docker run -d --network app-network --restart always --name email-server -p 0.0.0.0:8025:80 \
+run_docker "docker run -d --network app-network --restart always --name email-server -p 0.0.0.0:8025:5001 \
     --env-file /opt/iykonect/env/app.env \
     -v /opt/iykonect/config:/app/config \
     571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:email-server-latest" "email-server" || exit 1

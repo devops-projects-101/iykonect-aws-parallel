@@ -89,7 +89,7 @@ docker run -d --network app-network --restart always --name signable -p 0.0.0.0:
 
 # Deploy Email Server container
 log "Deploying Email Server container..."
-docker run -d --network app-network --restart always --name email-server -p 0.0.0.0:8025:80 \
+docker run -d --network app-network --restart always --name email-server -p 0.0.0.0:8025:5001 \
     --env-file /opt/iykonect/env/app.env \
     -v /opt/iykonect/config:/app/config \
     571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:email-server-latest

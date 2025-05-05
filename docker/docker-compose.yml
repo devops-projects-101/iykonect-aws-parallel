@@ -34,7 +34,7 @@ services:
   email-server:
     image: ${EMAIL_SERVER_IMAGE}
     ports:
-      - "8025:80"
+      - "8025:5001"
     restart: always
 
   company-house:

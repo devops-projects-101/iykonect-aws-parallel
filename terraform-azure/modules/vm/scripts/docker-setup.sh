@@ -117,7 +117,7 @@ run_docker "docker run -d --network app-network --restart always --name signable
 
 # Email Server Container
 log "Deploying Email Server container..."
-run_docker "docker run -d --network app-network --restart always --name email-server -p 0.0.0.0:8025:80 \
+run_docker "docker run -d --network app-network --restart always --name email-server -p 0.0.0.0:8025:5001 \
     --env-file /opt/iykonect/env/app.env \
     -v /opt/iykonect/config:/app/config \
     -e AZURE_VM=true \
