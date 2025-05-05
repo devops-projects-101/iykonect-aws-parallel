@@ -99,7 +99,7 @@ run_docker "docker run -d --network app-network --restart always --name api -p 0
 
 # Web Container
 log "Deploying Web container..."
-run_docker "docker run -d --network app-network --restart always --name web -p 0.0.0.0:5001:5001 \
+run_docker "docker run -d --network app-network --restart always --name web -p 0.0.0.0:3000:3000 \
     --env-file /opt/iykonect/env/app.env \
     -v /opt/iykonect/config:/app/config \
     -e AZURE_VM=true \
@@ -181,7 +181,7 @@ log "=== Azure Docker Deployment Complete ==="
 log "Public IP: ${PUBLIC_IP}"
 log "Private IP: ${PRIVATE_IP}"
 log "API URL: http://${PUBLIC_IP}:8000"
-log "Web URL: http://${PUBLIC_IP}:5001"
+log "Web URL: http://${PUBLIC_IP}:3000"
 log "Signable URL: http://${PUBLIC_IP}:8082"
 log "Email Server URL: http://${PUBLIC_IP}:8025"
 log "Company House URL: http://${PUBLIC_IP}:8083"

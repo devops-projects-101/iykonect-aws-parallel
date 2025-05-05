@@ -166,11 +166,11 @@ run_docker "docker run -d --network app-network --restart always --name api -p 0
 
 # Deploy Web container
 log "Deploying Web container..."
-if ! check_port 5001; then
-    log "ERROR: Port 5001 is not available"
+if ! check_port 3000; then
+    log "ERROR: Port 3000 is not available"
     exit 1
 fi
-run_docker "docker run -d --network app-network --restart always --name web -p 0.0.0.0:5001:5001 \
+run_docker "docker run -d --network app-network --restart always --name web -p 0.0.0.0:3000:3000 \
     --env-file /opt/iykonect/env/app.env \
     -v /opt/iykonect/config:/app/config \
     571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:web-latest" "web" || exit 1
@@ -259,7 +259,7 @@ sleep 10
 validate_endpoint "http://${PRIVATE_IP}:8000" || log "API validation failed but continuing"
 
 # Validate Web endpoint
-validate_endpoint "http://${PRIVATE_IP}:5001" || log "Web validation failed but continuing"
+validate_endpoint "http://${PRIVATE_IP}:3000" || log "Web validation failed but continuing"
 
 # Validate Signable endpoint
 validate_endpoint "http://${PRIVATE_IP}:8082" || log "Signable validation failed but continuing"
@@ -312,7 +312,7 @@ log "=== Deployment Complete ==="
 log "Public IP: ${PUBLIC_IP}"
 log "Private IP: ${PRIVATE_IP}"
 log "API URL: http://${PUBLIC_IP}:8000"
-log "Web URL: http://${PUBLIC_IP}:5001"
+log "Web URL: http://${PUBLIC_IP}:3000"
 log "Signable URL: http://${PUBLIC_IP}:8082"
 log "Email Server URL: http://${PUBLIC_IP}:8025"
 log "Company House URL: http://${PUBLIC_IP}:8083"

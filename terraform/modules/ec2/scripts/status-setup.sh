@@ -47,7 +47,7 @@ echo
 
 echo -e "${GREEN}APPLICATION URLs:${NC}"
 echo -e "  API:           http://${PUBLIC_IP}:8000"
-echo -e "  Web:           http://${PUBLIC_IP}:5001"
+echo -e "  Web:           http://${PUBLIC_IP}:3000"
 echo -e "  Signable:      http://${PUBLIC_IP}:8082"
 echo -e "  Email Server:  http://${PUBLIC_IP}:8025"
 echo -e "  Company House: http://${PUBLIC_IP}:8083"
@@ -89,7 +89,7 @@ echo
 echo "🌐 APPLICATION URLs"
 echo "──────────────────"
 echo "API URL:           http://${PUBLIC_IP}:8000"
-echo "Web URL:           http://${PUBLIC_IP}:5001"
+echo "Web URL:           http://${PUBLIC_IP}:3000"
 echo "Signable URL:      http://${PUBLIC_IP}:8082"
 echo "Email Server URL:  http://${PUBLIC_IP}:8025"
 echo "Company House URL: http://${PUBLIC_IP}:8083"

@@ -75,7 +75,7 @@ docker run -d --network app-network --restart always --name api -p 0.0.0.0:8000:
 
 # Deploy Web container
 log "Deploying Web container..."
-docker run -d --network app-network --restart always --name web -p 0.0.0.0:5001:5001 \
+docker run -d --network app-network --restart always --name web -p 0.0.0.0:3000:3000 \
     --env-file /opt/iykonect/env/app.env \
     -v /opt/iykonect/config:/app/config \
     571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:web-latest
@@ -137,7 +137,7 @@ cowsay -f turtle "Redeployment complete!" | tee -a /var/log/redeploy.log
 log "===================================================="
 log "Services available at:"
 log "API URL:           http://${PUBLIC_IP}:8000"
-log "Web URL:           http://${PUBLIC_IP}:5001"
+log "Web URL:           http://${PUBLIC_IP}:3000"
 log "Signable URL:      http://${PUBLIC_IP}:8082"
 log "Email Server URL:  http://${PUBLIC_IP}:8025"
 log "Company House URL: http://${PUBLIC_IP}:8083"

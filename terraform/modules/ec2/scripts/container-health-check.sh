@@ -105,7 +105,7 @@ PRIVATE_IP=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
 echo "CONTAINER       STATUS              ENDPOINT"
 echo "-----------------------------------------------"
 check_endpoint "http://${PRIVATE_IP}:8000" "api" "8000"
-check_endpoint "http://${PRIVATE_IP}:5001" "web" "5001"
+check_endpoint "http://${PRIVATE_IP}:3000" "web" "3000"
 check_endpoint "http://${PRIVATE_IP}:8082" "signable" "8082"
 check_endpoint "http://${PRIVATE_IP}:8025" "email-server" "8025"
 check_endpoint "http://${PRIVATE_IP}:8083" "company-house" "8083"
@@ -118,7 +118,7 @@ echo "PORT ACCESS CHECK"
 echo "----------------"
 FAILED_PORTS=""
 
-for port in 8000 5001 8082 8025 8083 6379 9090 3100 8008; do
+for port in 8000 3000 8082 8025 8083 6379 9090 3100 8008; do
     printf "%-5s: " "$port"
     if check_port_access "$port"; then
         echo -e "[${GREEN}ACCESSIBLE${NC}]"
