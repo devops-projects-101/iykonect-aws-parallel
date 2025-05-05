@@ -18,20 +18,20 @@ output "ssh_command" {
   value       = "ssh ${var.admin_username}@${azurerm_public_ip.vm[0].ip_address}"
 }
 
-output "docker_registry_endpoint" {
-  description = "URL for Docker Registry if deployed"
-  value       = ["http://${azurerm_public_ip.vm[*].ip_address}:5000"]
-}
+# output "docker_registry_endpoint" {
+#   description = "URL for Docker Registry if deployed"
+#   value       = formatlist("http://%s:5000", azurerm_public_ip.vm[*].ip_address)
+# }
 
-output "docker_api_endpoint" {
-  description = "Docker API endpoint"
-  value       = ["tcp://${azurerm_public_ip.vm[*].ip_address}:2375"]
-}
+# output "docker_api_endpoint" {
+#   description = "Docker API endpoint"
+#   value       = formatlist("tcp://%s:2375", azurerm_public_ip.vm[*].ip_address)
+# }
 
-output "docker_api_tls_endpoint" {
-  description = "Docker API TLS endpoint"
-  value       = ["tcp://${azurerm_public_ip.vm[*].ip_address}:2376"]
-}
+# output "docker_api_tls_endpoint" {
+#   description = "Docker API TLS endpoint"
+#   value       = formatlist("tcp://%s:2376", azurerm_public_ip.vm[*].ip_address)
+# }
 
 output "docker_container_urls" {
   description = "Map of container names to their URLs"
