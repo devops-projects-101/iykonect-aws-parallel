@@ -29,6 +29,9 @@ apt-get install -y \
     unzip \
     software-properties-common
 
+
+aws_region="eu-west-1"
+
 # Export AWS credentials for ECR access
 export AWS_ACCESS_KEY_ID="${aws_access_key}"
 export AWS_SECRET_ACCESS_KEY="${aws_secret_key}"
