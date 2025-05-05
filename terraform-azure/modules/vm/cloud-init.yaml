@@ -31,6 +31,7 @@ write_files:
       export AWS_SECRET_ACCESS_KEY="${aws_secret_key}"
       export AWS_DEFAULT_REGION="${aws_region}"
       
+      # Create AWS credentials directory and file
       mkdir -p /home/${admin_username}/.aws
       cat > /home/${admin_username}/.aws/credentials << EOC
       [default]
@@ -39,12 +40,32 @@ write_files:
       region = ${aws_region}
       EOC
       
+      # Create AWS config file
+      cat > /home/${admin_username}/.aws/config << EOC
+      [default]
+      region = ${aws_region}
+      output = json
+      EOC
+      
+      # Set correct ownership and permissions
       chown -R ${admin_username}:${admin_username} /home/${admin_username}/.aws
       chmod 600 /home/${admin_username}/.aws/credentials
+      chmod 600 /home/${admin_username}/.aws/config
+      
+      # Also set up root AWS credentials for system-level operations
+      mkdir -p /root/.aws
+      cp /home/${admin_username}/.aws/credentials /root/.aws/
+      cp /home/${admin_username}/.aws/config /root/.aws/
+      chmod 600 /root/.aws/credentials
+      chmod 600 /root/.aws/config
       
       # Create directories for the repository
       log "Creating directories for repository..."
       mkdir -p /opt/iykonect-aws-repo
+      mkdir -p /opt/iykonect/config
+      mkdir -p /opt/iykonect/env
+      mkdir -p /opt/iykonect/prometheus
+      mkdir -p /opt/iykonect/grafana
       
       # Download code from AWS S3
       log "Downloading code repository from AWS S3..."
@@ -65,9 +86,18 @@ write_files:
       
       # Create symlinks to the script directory for easier access
       mkdir -p /opt/iykonect-aws
+      ln -sf /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/azure-monitor-setup.sh /opt/iykonect-aws/
+      ln -sf /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/container-health-check.sh /opt/iykonect-aws/
+      ln -sf /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/docker-setup.sh /opt/iykonect-aws/
+      ln -sf /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/redeploy.sh /opt/iykonect-aws/
+      
+      # Also create symlinks to the AWS scripts that might be needed
       ln -sf /opt/iykonect-aws-repo/terraform/modules/ec2/scripts/secrets-setup.sh /opt/iykonect-aws/
-      ln -sf /opt/iykonect-aws-repo/terraform/modules/ec2/scripts/docker-setup.sh /opt/iykonect-aws/
       ln -sf /opt/iykonect-aws-repo/terraform/modules/ec2/scripts/status-setup.sh /opt/iykonect-aws/
+      
+      # Install Azure CLI for better integration
+      log "Installing Azure CLI..."
+      curl -sL https://aka.ms/InstallAzureCLIDeb | bash
       
       # Execute status command setup
       log "Running status command setup..."
@@ -77,9 +107,13 @@ write_files:
       log "Running AWS Secrets Manager setup..."
       /opt/iykonect-aws-repo/terraform/modules/ec2/scripts/secrets-setup.sh
       
+      # Execute Azure Monitor setup
+      log "Running Azure Monitor setup..."
+      /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/azure-monitor-setup.sh
+      
       # Execute Docker setup
       log "Running Docker setup and deployment..."
-      /opt/iykonect-aws-repo/terraform/modules/ec2/scripts/docker-setup.sh
+      /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/docker-setup.sh
       
       log "=== Bootstrap complete ==="
       
