@@ -1,8 +1,8 @@
 # Azure Configuration
-prefix          = "iykonect-azure"
+prefix          = "iykonect-azure-infra"
 location        = "West Europe"
 vm_size         = "Standard_B2s"
-admin_username  = "adminuser"
+admin_username  = "azure"
 # admin_password is provided via GitHub Actions secrets
 desired_count   = 1
 

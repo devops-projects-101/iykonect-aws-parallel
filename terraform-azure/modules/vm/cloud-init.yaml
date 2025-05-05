@@ -25,6 +25,9 @@ write_files:
           echo "[$(date)] $1" | sudo tee -a /var/log/bootstrap.log
       }
       
+      #variables
+      aws_region="eu-west-1"
+
       # Set AWS credentials for ECR access
       log "Setting AWS credentials for ECR access"
       export AWS_ACCESS_KEY_ID="${aws_access_key}"
