@@ -61,15 +61,16 @@ cp /home/${admin_username}/.aws/config /root/.aws/
 chmod 600 /root/.aws/credentials
 chmod 600 /root/.aws/config
 
-# Set Azure-specific variables
+# Set Azure-specific variables at runtime, not through template
 AZURE_VM="true"
-VM_HOSTNAME=$(hostname)
+# Get hostname and IP addresses at runtime
+LOCAL_VM_HOSTNAME=$(hostname)
 PUBLIC_IP=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/publicIpAddress?api-version=2021-02-01&format=text")
 PRIVATE_IP=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/privateIpAddress?api-version=2021-02-01&format=text")
 RESOURCE_GROUP=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/compute/resourceGroupName?api-version=2021-02-01&format=text")
 LOCATION=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/compute/location?api-version=2021-02-01&format=text")
 
-log "Instance info: VM=${VM_HOSTNAME}, Location=${LOCATION}, Public IP=${PUBLIC_IP}, Private IP=${PRIVATE_IP}"
+log "Instance info: VM=${LOCAL_VM_HOSTNAME}, Location=${LOCATION}, Public IP=${PUBLIC_IP}, Private IP=${PRIVATE_IP}"
 
 # Create directories for the repository and necessary config directories
 log "Creating directories for repository and configurations..."
@@ -135,7 +136,7 @@ log "Secrets Manager setup completed"
 
 # Execute Azure Monitor setup
 log "Running Azure Monitor setup..."
-#/opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/azure-monitor-setup.sh
+/opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/azure-monitor-setup.sh
 log "Azure Monitor setup completed"
 
 # Execute Docker setup and deployment
