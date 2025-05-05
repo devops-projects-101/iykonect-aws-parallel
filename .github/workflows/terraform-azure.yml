@@ -69,8 +69,8 @@ jobs:
         az storage account create --name iykonectazurestore --resource-group iykonect-azure-parallel-rg --location westeurope --sku Standard_LRS --kind StorageV2
 
         # Check if container exists, create if not
-        az storage container show --name tfstate --account-name iykonectazurestore 2>/dev/null || \
-        az storage container create --name tfstate --account-name iykonectazurestore --auth-mode login
+        az storage container show --name iykonectazureblob --account-name iykonectazurestore 2>/dev/null || \
+        az storage container create --name iykonectazureblob --account-name iykonectazurestore --auth-mode login
 
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v2

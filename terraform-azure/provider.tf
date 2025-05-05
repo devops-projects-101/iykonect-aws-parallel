@@ -13,7 +13,7 @@ terraform {
   backend "azurerm" {
     resource_group_name  = "iykonect-azure-parallel-rg"
     storage_account_name = "iykonectazurestore"
-    container_name       = "tfstate"
+    container_name       = "iykonectazureblob"
     key                  = "azure-infra.terraform.tfstate"
   }
 }
