@@ -89,7 +89,7 @@ log "Deploying containers with Azure-specific configurations..."
 
 # API Container
 log "Deploying API container..."
-run_docker "docker run -d --network app-network --restart always --name api -p 0.0.0.0:8000:8000 \
+run_docker "docker run -d --network app-network --restart always --name api -p 0.0.0.0:8000:80 \
     --env-file /opt/iykonect/env/app.env \
     -v /opt/iykonect/config:/app/config \
     -e AZURE_VM=true \
@@ -109,7 +109,7 @@ run_docker "docker run -d --network app-network --restart always --name web -p 0
 
 # Signable Container
 log "Deploying Signable container..."
-run_docker "docker run -d --network app-network --restart always --name signable -p 0.0.0.0:8082:8082 \
+run_docker "docker run -d --network app-network --restart always --name signable -p 0.0.0.0:8082:80 \
     --env-file /opt/iykonect/env/app.env \
     -v /opt/iykonect/config:/app/config \
     -e AZURE_VM=true \
@@ -117,7 +117,7 @@ run_docker "docker run -d --network app-network --restart always --name signable
 
 # Email Server Container
 log "Deploying Email Server container..."
-run_docker "docker run -d --network app-network --restart always --name email-server -p 0.0.0.0:8025:8025 \
+run_docker "docker run -d --network app-network --restart always --name email-server -p 0.0.0.0:8025:80 \
     --env-file /opt/iykonect/env/app.env \
     -v /opt/iykonect/config:/app/config \
     -e AZURE_VM=true \
@@ -125,7 +125,7 @@ run_docker "docker run -d --network app-network --restart always --name email-se
 
 # Company House Container
 log "Deploying Company House container..."
-run_docker "docker run -d --network app-network --restart always --name company-house -p 0.0.0.0:8083:8083 \
+run_docker "docker run -d --network app-network --restart always --name company-house -p 0.0.0.0:8083:80 \
     --env-file /opt/iykonect/env/app.env \
     -v /opt/iykonect/config:/app/config \
     -e AZURE_VM=true \
@@ -144,7 +144,7 @@ run_docker "docker run -d --network app-network --restart always --name promethe
 
 # Grafana Container
 log "Deploying Grafana container..."
-run_docker "docker run -d --network app-network --restart always --name grafana -p 0.0.0.0:3100:3100 \
+run_docker "docker run -d --network app-network --restart always --name grafana -p 0.0.0.0:3100:3000 \
     -v /opt/iykonect/grafana:/var/lib/grafana \
     571664317480.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/iykonect-images:grafana-latest" "grafana" || exit 1
 

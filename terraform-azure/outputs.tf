@@ -49,7 +49,7 @@ output "load_balancer_container_urls" {
   description = "Map of container names to their load balancer URLs"
   value = {
     api           = "http://${module.load_balancer.public_ip_address}:8000"
-    web           = "http://${module.load_balancer.public_ip_address}:5001"
+    web           = "http://${module.load_balancer.public_ip_address}:3000"
     signable      = "http://${module.load_balancer.public_ip_address}:8082"
     email_server  = "http://${module.load_balancer.public_ip_address}:8025"
     company_house = "http://${module.load_balancer.public_ip_address}:8083"

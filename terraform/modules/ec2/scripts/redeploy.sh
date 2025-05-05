@@ -68,7 +68,7 @@ docker pull nginx:latest
 
 # Deploy API container
 log "Deploying API container..."
-docker run -d --network app-network --restart always --name api -p 0.0.0.0:8000:8000 \
+docker run -d --network app-network --restart always --name api -p 0.0.0.0:8000:80 \
     --env-file /opt/iykonect/env/app.env \
     -v /opt/iykonect/config:/app/config \
     571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:api-latest
@@ -82,21 +82,21 @@ docker run -d --network app-network --restart always --name web -p 0.0.0.0:3000:
 
 # Deploy Signable container
 log "Deploying Signable container..."
-docker run -d --network app-network --restart always --name signable -p 0.0.0.0:8082:8082 \
+docker run -d --network app-network --restart always --name signable -p 0.0.0.0:8082:80 \
     --env-file /opt/iykonect/env/app.env \
     -v /opt/iykonect/config:/app/config \
     571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:signable-latest
 
 # Deploy Email Server container
 log "Deploying Email Server container..."
-docker run -d --network app-network --restart always --name email-server -p 0.0.0.0:8025:8025 \
+docker run -d --network app-network --restart always --name email-server -p 0.0.0.0:8025:80 \
     --env-file /opt/iykonect/env/app.env \
     -v /opt/iykonect/config:/app/config \
     571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:email-server-latest
 
 # Deploy Company House container
 log "Deploying Company House container..."
-docker run -d --network app-network --restart always --name company-house -p 0.0.0.0:8083:8083 \
+docker run -d --network app-network --restart always --name company-house -p 0.0.0.0:8083:80 \
     --env-file /opt/iykonect/env/app.env \
     -v /opt/iykonect/config:/app/config \
     571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:company-house-latest
@@ -114,7 +114,7 @@ docker run -d --network app-network --restart always --name prometheus -p 0.0.0.
 
 # Deploy Grafana container
 log "Deploying Grafana container..."
-docker run -d --network app-network --restart always --name grafana -p 0.0.0.0:3100:3100 \
+docker run -d --network app-network --restart always --name grafana -p 0.0.0.0:3100:3000 \
     -v /opt/iykonect/grafana:/var/lib/grafana \
     571664317480.dkr.ecr.${AWS_REGION}.amazonaws.com/iykonect-images:grafana-latest
 

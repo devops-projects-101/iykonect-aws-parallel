@@ -20,7 +20,7 @@ output "api_endpoint" {
 
 output "web_endpoint" {
   description = "HTTP endpoint for the Web service"
-  value = "http://${aws_instance.main.public_ip}:5001"
+  value = "http://${aws_instance.main.public_ip}:3000"
 }
 
 output "signable_endpoint" {

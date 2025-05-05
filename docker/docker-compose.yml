@@ -10,9 +10,37 @@ services:
   api:
     image: ${API_IMAGE}
     ports:
-      - "8080:80"
+      - "8000:80"
     depends_on:
       - redis
+    restart: always
+
+  web:
+    image: ${WEB_IMAGE}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - api
+    restart: always
+
+  signable:
+    image: ${SIGNABLE_IMAGE}
+    ports:
+      - "8082:80"
+    depends_on:
+      - api
+    restart: always
+
+  email-server:
+    image: ${EMAIL_SERVER_IMAGE}
+    ports:
+      - "8025:80"
+    restart: always
+
+  company-house:
+    image: ${COMPANY_HOUSE_IMAGE}
+    ports:
+      - "8083:80"
     restart: always
 
   sonarqube:
@@ -42,7 +70,7 @@ services:
   grafana:
     image: ${GRAFANA_IMAGE}
     ports:
-      - "3000:3000"
+      - "3100:3000"
     depends_on:
       - prometheus
     restart: always
