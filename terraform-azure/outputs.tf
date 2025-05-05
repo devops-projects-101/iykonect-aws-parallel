@@ -23,26 +23,26 @@ output "ssh_command" {
   value       = module.vm.ssh_command
 }
 
-# Docker URL outputs
-output "docker_registry_endpoint" {
-  description = "URL for Docker Registry if deployed"
-  value       = module.vm.docker_registry_endpoint
-}
+# # Docker URL outputs
+# output "docker_registry_endpoint" {
+#   description = "URL for Docker Registry if deployed"
+#   value       = module.vm.docker_registry_endpoint
+# }
 
-output "docker_api_endpoint" {
-  description = "Docker API endpoint"
-  value       = module.vm.docker_api_endpoint
-}
+# output "docker_api_endpoint" {
+#   description = "Docker API endpoint"
+#   value       = module.vm.docker_api_endpoint
+# }
 
-output "docker_api_tls_endpoint" {
-  description = "Docker API TLS endpoint"
-  value       = module.vm.docker_api_tls_endpoint
-}
+# output "docker_api_tls_endpoint" {
+#   description = "Docker API TLS endpoint"
+#   value       = module.vm.docker_api_tls_endpoint
+# }
 
-output "docker_container_urls" {
-  description = "Map of container names to their URLs"
-  value       = module.vm.docker_container_urls
-}
+# output "docker_container_urls" {
+#   description = "Map of container names to their URLs"
+#   value       = module.vm.docker_container_urls
+# }
 
 # Load balancer container URLs
 output "load_balancer_container_urls" {
