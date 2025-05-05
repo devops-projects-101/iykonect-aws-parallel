@@ -62,15 +62,11 @@ chmod 600 /root/.aws/credentials
 chmod 600 /root/.aws/config
 
 # Set Azure-specific variables at runtime, not through template
+# Using BASH_VAR format for variables that should be determined at runtime
 AZURE_VM="true"
-# Get hostname and IP addresses at runtime
-LOCAL_VM_HOSTNAME=$(hostname)
-PUBLIC_IP=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/publicIpAddress?api-version=2021-02-01&format=text")
-PRIVATE_IP=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/privateIpAddress?api-version=2021-02-01&format=text")
-RESOURCE_GROUP=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/compute/resourceGroupName?api-version=2021-02-01&format=text")
-LOCATION=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/compute/location?api-version=2021-02-01&format=text")
-
-log "Instance info: VM=${LOCAL_VM_HOSTNAME}, Location=${LOCATION}, Public IP=${PUBLIC_IP}, Private IP=${PRIVATE_IP}"
+# Using single quotes to prevent Terraform from processing these as template variables
+log 'Getting Azure VM metadata at runtime...'
+log 'Hostname, IP addresses, and other Azure metadata will be determined when the script runs on the VM'
 
 # Create directories for the repository and necessary config directories
 log "Creating directories for repository and configurations..."
@@ -123,6 +119,31 @@ rm packages-microsoft-prod.deb
 apt-get update
 apt-get install -y azure-monitor-agent
 log "Azure Monitor installation completed"
+
+# Execute Azure metadata collection at runtime
+# This is done here to avoid Terraform template variable issues
+cat > /opt/get-azure-metadata.sh << 'EOFMETADATA'
+#!/bin/bash
+# This script runs at VM boot time and collects Azure metadata
+LOCAL_VM_HOSTNAME=$(hostname)
+PUBLIC_IP=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/publicIpAddress?api-version=2021-02-01&format=text")
+PRIVATE_IP=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/privateIpAddress?api-version=2021-02-01&format=text")
+RESOURCE_GROUP=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/compute/resourceGroupName?api-version=2021-02-01&format=text")
+LOCATION=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/compute/location?api-version=2021-02-01&format=text")
+
+# Log the collected metadata
+echo "[$(date)] Instance info: VM=$LOCAL_VM_HOSTNAME, Location=$LOCATION, Public IP=$PUBLIC_IP, Private IP=$PRIVATE_IP" | sudo tee -a /var/log/user-data.log
+
+# Export variables for other scripts
+export LOCAL_VM_HOSTNAME
+export PUBLIC_IP
+export PRIVATE_IP
+export RESOURCE_GROUP
+export LOCATION
+EOFMETADATA
+
+chmod +x /opt/get-azure-metadata.sh
+/opt/get-azure-metadata.sh
 
 # Execute status command setup
 log "Running status command setup..."
