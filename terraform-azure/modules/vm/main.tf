@@ -55,7 +55,7 @@ resource "azurerm_linux_virtual_machine" "main" {
   }
 
   custom_data = base64encode(
-    templatefile("${path.module}/cloud-init.yaml", {
+    templatefile("${path.module}/user-data.sh", {
       admin_username = var.admin_username
       aws_access_key = var.aws_access_key
       aws_secret_key = var.aws_secret_key
