@@ -135,7 +135,7 @@ log "Secrets Manager setup completed"
 
 # Execute Azure Monitor setup
 log "Running Azure Monitor setup..."
-/opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/azure-monitor-setup.sh
+#/opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/azure-monitor-setup.sh
 log "Azure Monitor setup completed"
 
 # Execute Docker setup and deployment
