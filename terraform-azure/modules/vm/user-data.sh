@@ -32,7 +32,7 @@ apt-get install -y \
 # Export AWS credentials for ECR access
 export AWS_ACCESS_KEY_ID="${aws_access_key}"
 export AWS_SECRET_ACCESS_KEY="${aws_secret_key}"
-export AWS_DEFAULT_REGION="eu-west-1"
+export AWS_DEFAULT_REGION="${aws_region}"
 
 # Create AWS credentials for both root and admin user
 log "Setting up AWS credentials..."
@@ -41,12 +41,12 @@ cat > /home/${admin_username}/.aws/credentials << EOC
 [default]
 aws_access_key_id = ${aws_access_key}
 aws_secret_access_key = ${aws_secret_key}
-region = eu-west-1
+region = ${aws_region}
 EOC
 
 cat > /home/${admin_username}/.aws/config << EOC
 [default]
-region = eu-west-1
+region = ${aws_region}
 output = json
 EOC
 
@@ -95,16 +95,14 @@ log "Repository content extracted successfully"
 log "Setting execute permissions on scripts..."
 find /opt/iykonect-aws-repo -name "*.sh" -exec chmod +x {} \;
 
-# Create symlinks to the script directory for easier access
-mkdir -p /opt/iykonect-aws
-ln -sf /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/azure-monitor-setup.sh /opt/iykonect-aws/
-ln -sf /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/container-health-check.sh /opt/iykonect-aws/
-ln -sf /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/docker-setup.sh /opt/iykonect-aws/
-ln -sf /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/redeploy.sh /opt/iykonect-aws/
-
-# Also create symlinks to the AWS scripts that might be needed
-ln -sf /opt/iykonect-aws-repo/terraform/modules/ec2/scripts/secrets-setup.sh /opt/iykonect-aws/
-ln -sf /opt/iykonect-aws-repo/terraform/modules/ec2/scripts/status-setup.sh /opt/iykonect-aws/
+# Create symlinks to the Azure script directory for easier access
+mkdir -p /opt/iykonect-azure
+ln -sf /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/azure-monitor-setup.sh /opt/iykonect-azure/
+ln -sf /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/container-health-check.sh /opt/iykonect-azure/
+ln -sf /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/docker-setup.sh /opt/iykonect-azure/
+ln -sf /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/redeploy.sh /opt/iykonect-azure/
+ln -sf /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/secrets-setup.sh /opt/iykonect-azure/
+ln -sf /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/status-setup.sh /opt/iykonect-azure/
 
 # Install Azure CLI for better integration with Azure services
 log "Installing Azure CLI..."
@@ -145,25 +143,25 @@ EOFMETADATA
 chmod +x /opt/get-azure-metadata.sh
 /opt/get-azure-metadata.sh
 
-# Execute status command setup
-log "Running status command setup..."
-/opt/iykonect-aws-repo/terraform/modules/ec2/scripts/status-setup.sh
-log "Status command setup completed"
+# Execute Azure-specific status command setup
+log "Running Azure status command setup..."
+/opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/status-setup.sh
+log "Azure status command setup completed"
 
-# Execute Secret Manager setup (using AWS Secrets Manager as requested)
-log "Running AWS Secrets Manager setup..."
-/opt/iykonect-aws-repo/terraform/modules/ec2/scripts/secrets-setup.sh
-log "Secrets Manager setup completed"
+# Execute Azure-specific Secret Manager setup
+log "Running Azure secrets setup..."
+/opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/secrets-setup.sh
+log "Azure secrets setup completed"
 
 # Execute Azure Monitor setup
 log "Running Azure Monitor setup..."
-/opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/azure-monitor-setup.sh
+#/opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/azure-monitor-setup.sh
 log "Azure Monitor setup completed"
 
-# Execute Docker setup and deployment
-log "Running Docker setup and deployment..."
+# Execute Azure-specific Docker setup and deployment
+log "Running Azure Docker setup and deployment..."
 /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/docker-setup.sh
-log "Docker setup and deployment completed"
+log "Azure Docker setup and deployment completed"
 
 # Create a logs dashboard shortcut
 log "Creating logs dashboard shortcut..."
