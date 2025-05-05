@@ -52,7 +52,6 @@ jobs:
         aws s3api create-bucket --bucket iykonect-aws-parallel --region us-east-1
 
     - name: Package and upload code to S3
-      if: (github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'create_infra')
       run: |
         echo "Packaging repository content..."
         cd $GITHUB_WORKSPACE
