@@ -35,7 +35,7 @@ aws_region="eu-west-1"
 # Export AWS credentials for ECR access
 export AWS_ACCESS_KEY_ID="${aws_access_key}"
 export AWS_SECRET_ACCESS_KEY="${aws_secret_key}"
-export AWS_DEFAULT_REGION="${aws_region}"
+export AWS_DEFAULT_REGION="eu-west-1"
 
 # Create AWS credentials for both root and admin user
 log "Setting up AWS credentials..."
@@ -44,12 +44,12 @@ cat > /home/${admin_username}/.aws/credentials << EOC
 [default]
 aws_access_key_id = ${aws_access_key}
 aws_secret_access_key = ${aws_secret_key}
-region = ${aws_region}
+region = eu-west-1
 EOC
 
 cat > /home/${admin_username}/.aws/config << EOC
 [default]
-region = ${aws_region}
+region = eu-west-1
 output = json
 EOC
 
