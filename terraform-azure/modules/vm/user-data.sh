@@ -29,7 +29,6 @@ apt-get install -y \
     unzip \
     software-properties-common
 
-
 aws_region="eu-west-1"
 
 # Export AWS credentials for ECR access
@@ -112,14 +111,24 @@ log "Installing Azure CLI..."
 curl -sL https://aka.ms/InstallAzureCLIDeb | bash
 log "Azure CLI installation completed"
 
-# Install Azure Monitor agent using direct package installation
+# Install Azure Monitor agent properly for Ubuntu 20.04
 log "Installing Azure Monitor agent..."
+# First, add Microsoft repository and signing key
 wget -q https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/packages-microsoft-prod.deb
 dpkg -i packages-microsoft-prod.deb
 rm packages-microsoft-prod.deb
+
+# Update apt and install the Log Analytics agent instead of azure-monitor-agent
+# which is not available for Ubuntu 20.04 in the standard repositories
 apt-get update
-apt-get install -y azure-monitor-agent
-log "Azure Monitor installation completed"
+apt-get install -y microsoft-monitoring-agent
+
+# Install the dependency agent for enhanced monitoring
+curl -sSO https://aka.ms/dependencyagentlinux
+sh ./dependencyagentlinux
+rm ./dependencyagentlinux
+
+log "Azure Monitoring agents installation completed"
 
 # Execute Azure metadata collection at runtime
 # This is done here to avoid Terraform template variable issues
@@ -158,7 +167,7 @@ log "Azure secrets setup completed"
 
 # Execute Azure Monitor setup
 log "Running Azure Monitor setup..."
-#/opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/azure-monitor-setup.sh
+/opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/azure-monitor-setup.sh
 log "Azure Monitor setup completed"
 
 # Execute Azure-specific Docker setup and deployment

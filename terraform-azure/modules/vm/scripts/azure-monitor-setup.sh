@@ -23,83 +23,53 @@ log "Resource Group: $RESOURCE_GROUP"
 log "Subscription ID: $SUBSCRIPTION_ID"
 log "Location: $LOCATION"
 
-# Install Azure Monitor agent using packages instead of the redirection script
-log "Installing Azure Monitor agent using direct package installation..."
+# Install Log Analytics agent (OMS Agent) instead of Azure Monitor agent
+# The Azure Monitor agent is not available for Ubuntu 20.04 in the standard repositories
+log "Installing Log Analytics agent (OMS Agent) for Ubuntu 20.04..."
+
 # Add Microsoft signing key and repo
 wget -q https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/packages-microsoft-prod.deb
 dpkg -i packages-microsoft-prod.deb
 rm packages-microsoft-prod.deb
 
-# Update package lists and install Azure Monitor agent
+# Update package lists and install Log Analytics agent
 apt-get update
-apt-get install -y azure-monitor-agent
+apt-get install -y microsoft-monitoring-agent
 
-# Configure Azure Monitor to collect Docker metrics
-log "Configuring Azure Monitor to collect Docker metrics..."
-mkdir -p /etc/azuremonitoragent/config-cache/configchunks
+# Install the dependency agent for enhanced monitoring capabilities
+log "Installing Azure Dependency agent..."
+curl -sSO https://aka.ms/dependencyagentlinux
+sh ./dependencyagentlinux
+rm ./dependencyagentlinux
 
-# Create Docker metrics collection configuration
-cat > /etc/azuremonitoragent/config-cache/configchunks/docker.json << 'EOF'
-{
-  "logs": [
-    {
-      "name": "dockerContainerLogs",
-      "streams": ["stdout", "stderr"],
-      "extensionName": "DockerContainerInsights",
-      "extensionSettings": {
-        "containerId": "*"
-      }
-    }
-  ],
-  "metrics": [
-    {
-      "name": "dockerContainerStats",
-      "extensionName": "DockerContainerInsights",
-      "extensionSettings": {
-        "containerId": "*"
-      }
-    }
-  ]
-}
+log "Azure monitoring agents installed successfully"
+
+# Configure monitoring for Docker
+log "Configuring monitoring for Docker containers..."
+
+# Create directories for logs
+mkdir -p /opt/iykonect/logs
+mkdir -p /opt/iykonect/monitor
+
+# Create a Docker stats collection script
+cat > /opt/iykonect/monitor/docker-stats.sh << 'EOF'
+#!/bin/bash
+STATS_FILE="/opt/iykonect/logs/docker-stats.log"
+echo "Timestamp: $(date)" > $STATS_FILE
+echo "Docker Containers:" >> $STATS_FILE
+docker ps --format "{{.Names}}" | while read container; do
+  echo "Container: $container" >> $STATS_FILE
+  docker stats --no-stream --format "table {{.CPUPerc}}\t{{.MemUsage}}\t{{.NetIO}}\t{{.BlockIO}}" $container >> $STATS_FILE
+  echo "" >> $STATS_FILE
+done
 EOF
 
-# Configure log collection for user data log
-log "Configuring log collection for user-data.log..."
-cat > /etc/azuremonitoragent/config-cache/configchunks/userdatalogs.json << 'EOF'
-{
-  "logs": [
-    {
-      "name": "userDataLog",
-      "streams": ["file"],
-      "extensionName": "File",
-      "extensionSettings": {
-        "path": "/var/log/user-data.log"
-      }
-    },
-    {
-      "name": "systemLog",
-      "streams": ["file"],
-      "extensionName": "File",
-      "extensionSettings": {
-        "path": "/var/log/syslog"
-      }
-    },
-    {
-      "name": "dockerLog",
-      "streams": ["file"],
-      "extensionName": "File",
-      "extensionSettings": {
-        "path": "/var/log/docker.log"
-      }
-    }
-  ]
-}
-EOF
+chmod +x /opt/iykonect/monitor/docker-stats.sh
 
-# Restart the Azure Monitor agent to apply changes
-log "Restarting Azure Monitor agent..."
-systemctl restart azuremonitoragent || log "Warning: Couldn't restart azuremonitoragent, may need to be started first"
-systemctl enable azuremonitoragent
+# Create a cron job to collect Docker stats every minute
+cat > /etc/cron.d/docker-stats << 'EOF'
+* * * * * root /opt/iykonect/monitor/docker-stats.sh > /dev/null 2>&1
+EOF
 
 # Create a service for tailing user-data.log to the dashboard
 log "Setting up user-data.log streaming service..."
@@ -118,9 +88,6 @@ RestartSec=5
 WantedBy=multi-user.target
 EOF
 
-# Create log directory
-mkdir -p /opt/iykonect/logs
-
 # Enable and start the service
 systemctl daemon-reload
 systemctl enable log-stream
@@ -137,15 +104,54 @@ echo "Last 20 lines of user-data.log:"
 echo "--------------------------------------------"
 tail -n 20 /var/log/user-data.log
 echo ""
+echo "Docker Stats Summary:"
+echo "--------------------------------------------"
+tail -n 10 /opt/iykonect/logs/docker-stats.log
+echo ""
 echo "For more logs, use: tail -n 100 /var/log/user-data.log"
 echo "=============================================="
 EOF
 
 chmod +x /usr/local/bin/logs-dashboard
 
-# Add logs-dashboard to aliases
+# Add an enhanced monitoring dashboard script
+cat > /usr/local/bin/az-monitor << 'EOF'
+#!/bin/bash
+clear
+echo "=============================================="
+echo "    IYKonect Azure Monitoring Dashboard      "
+echo "=============================================="
+echo ""
+echo "SYSTEM RESOURCES:"
+echo "--------------------------------------------"
+echo "CPU Usage:"
+top -bn1 | head -n 5
+echo ""
+echo "Memory Usage:"
+free -h
+echo ""
+echo "Disk Usage:"
+df -h /
+echo ""
+echo "DOCKER CONTAINERS:"
+echo "--------------------------------------------"
+docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
+echo ""
+echo "RECENT LOGS:"
+echo "--------------------------------------------"
+echo "Last 10 lines of user-data.log:"
+tail -n 10 /var/log/user-data.log
+echo ""
+echo "=============================================="
+EOF
+
+chmod +x /usr/local/bin/az-monitor
+
+# Add logs-dashboard and az-monitor to aliases
 mkdir -p /etc/profile.d
 echo "alias logs-dashboard='/usr/local/bin/logs-dashboard'" >> /etc/profile.d/iykonect-welcome.sh
+echo "alias az-monitor='/usr/local/bin/az-monitor'" >> /etc/profile.d/iykonect-welcome.sh
 
-log "Enhanced Azure Monitor setup completed with dashboard for user-data.log visualization."
+log "Enhanced Azure Monitor setup completed with dashboard for system monitoring."
 log "You can use the 'logs-dashboard' command to access log dashboards."
+log "You can use the 'az-monitor' command to access the system monitoring dashboard."
