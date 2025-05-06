@@ -6,11 +6,20 @@ resource "azurerm_virtual_network" "main" {
   tags                = var.tags
 }
 
-resource "azurerm_subnet" "main" {
-  name                 = "${var.prefix}-subnet"
+# Rename the main subnet to be VM-specific
+resource "azurerm_subnet" "vm" {
+  name                 = "${var.prefix}-vm-subnet"
   resource_group_name  = var.resource_group_name
   virtual_network_name = azurerm_virtual_network.main.name
   address_prefixes     = ["10.0.1.0/24"]
+}
+
+# Create a separate subnet for Application Gateway
+resource "azurerm_subnet" "appgw" {
+  name                 = "${var.prefix}-appgw-subnet"
+  resource_group_name  = var.resource_group_name
+  virtual_network_name = azurerm_virtual_network.main.name
+  address_prefixes     = ["10.0.2.0/24"]
 }
 
 resource "azurerm_network_security_group" "main" {
@@ -275,7 +284,12 @@ resource "azurerm_network_security_group" "main" {
   }
 }
 
-resource "azurerm_subnet_network_security_group_association" "main" {
-  subnet_id                 = azurerm_subnet.main.id
+resource "azurerm_subnet_network_security_group_association" "vm" {
+  subnet_id                 = azurerm_subnet.vm.id
+  network_security_group_id = azurerm_network_security_group.main.id
+}
+
+resource "azurerm_subnet_network_security_group_association" "appgw" {
+  subnet_id                 = azurerm_subnet.appgw.id
   network_security_group_id = azurerm_network_security_group.main.id
 }

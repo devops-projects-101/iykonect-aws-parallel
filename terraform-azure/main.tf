@@ -32,9 +32,11 @@ resource "azurerm_storage_blob" "vm_config" {
     aws_secret_key = var.aws_secret_key,
     aws_region     = var.aws_region,
     admin_username = var.admin_username,
-  #  environment    = var.environment,
     app_name       = "${var.prefix}-app"
   })
+  
+  # Explicit dependency on the container to ensure it exists before creating the blob
+  depends_on = [azurerm_storage_container.config]
 }
 
 # Create Network Watcher in the main resource group instead of letting Azure create NetworkWatcherRG
@@ -59,7 +61,7 @@ module "application_gateway" {
   prefix               = var.prefix
   resource_group_name  = azurerm_resource_group.main.name
   location             = var.location
-  subnet_id            = module.virtual_network.subnet_id
+  subnet_id            = module.virtual_network.appgw_subnet_id
   tags                 = var.default_tags
 }
 
@@ -68,7 +70,7 @@ module "vm" {
   prefix               = var.prefix
   resource_group_name  = azurerm_resource_group.main.name
   location             = var.location
-  subnet_id            = module.virtual_network.subnet_id
+  subnet_id            = module.virtual_network.vm_subnet_id
   vm_size              = "Standard_D4s_v3"  # 4 vCPUs, 16 GB RAM
   admin_username       = var.admin_username
   admin_password       = var.admin_password
