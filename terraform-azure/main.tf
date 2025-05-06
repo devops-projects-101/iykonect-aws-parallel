@@ -78,4 +78,7 @@ module "vm" {
   tags                 = var.default_tags
   desired_count        = var.desired_count
 
+  storage_account_name   = azurerm_storage_account.config.name
+  storage_container_name = azurerm_storage_container.config.name
+  storage_blob_name      = azurerm_storage_blob.vm_config.name
 }
