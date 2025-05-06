@@ -15,16 +15,16 @@ LOCATION=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metada
 PUBLIC_IP=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/publicIpAddress?api-version=2021-02-01&format=text")
 PRIVATE_IP=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/privateIpAddress?api-version=2021-02-01&format=text")
 
+# Create timestamp for this run
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+
 # Check if AWS credentials are available and set AWS region
 if [ -f /root/.aws/credentials ]; then
-    # Extract AWS_REGION from credentials
     AWS_REGION=$(grep region /root/.aws/credentials | head -1 | cut -d= -f2 | tr -d ' ')
-    # If not found, use default
     if [ -z "$AWS_REGION" ]; then
         AWS_REGION="eu-west-1"
     fi
 else
-    # Default AWS region if credentials file doesn't exist
     AWS_REGION="eu-west-1"
     log "WARNING: AWS credentials file not found, using default region."
 fi
@@ -41,19 +41,26 @@ log "Private IP: $PRIVATE_IP"
 log "AWS Region for Secrets: $AWS_REGION"
 
 # Create necessary directories
-mkdir -p /opt/iykonect/env
-mkdir -p /opt/iykonect/config
+mkdir -p /opt/iykonect/env/history
+mkdir -p /opt/iykonect/config/history
+mkdir -p /opt/iykonect/config/current
+
 # Remove existing file if it exists to avoid appending to corrupted file
 rm -f /opt/iykonect/env/app.env
 touch /opt/iykonect/env/app.env
 chmod 600 /opt/iykonect/env/app.env
 
-# Also create an empty app.json for config merging
-echo "{}" > /opt/iykonect/config/app.json
-
-# Start with explicitly defined variables first
+# Create a new environment file with header documentation
 log "Setting up explicit environment variables for Azure environment"
 cat > /opt/iykonect/env/app.env << EOL
+# Environment configuration for IYKonect Azure VM
+# Generated on: $(date)
+# VM Name: $VM_NAME
+# Resource Group: $RESOURCE_GROUP
+# Location: $LOCATION
+# Public IP: $PUBLIC_IP
+# Private IP: $PRIVATE_IP
+
 # Base URLs
 API_ENDPOINT=http://${PUBLIC_IP}:8000
 REACT_APP_BASE_URL=http://${PUBLIC_IP}:8000
@@ -64,7 +71,7 @@ AZURE_VM=true
 AZURE_LOCATION=${LOCATION}
 AZURE_RESOURCE_GROUP=${RESOURCE_GROUP}
 
-# Database connection string with host being private IP of this VM 
+# Database connection string
 ConnectionStrings__DefaultConnection=Server=${PRIVATE_IP};Database=iykonect;User Id=iykonectuser;Password=iykonectpassword;
 
 # Service endpoints
@@ -72,6 +79,12 @@ SERVICE_EMAIL_ENDPOINT=http://${PRIVATE_IP}:8025
 SERVICE_COMPANY_HOUSE_ENDPOINT=http://${PRIVATE_IP}:8083
 SERVICE_SIGNABLE_ENDPOINT=http://${PRIVATE_IP}:8082
 EOL
+
+# Make a timestamped copy
+cp /opt/iykonect/env/app.env "/opt/iykonect/env/history/app.env.${TIMESTAMP}"
+
+# Initialize app.json if it doesn't exist
+echo "{}" > /opt/iykonect/config/app.json
 
 # Test AWS CLI to ensure it's properly configured
 log "Testing AWS CLI configuration..."
@@ -167,7 +180,8 @@ for FULL_SECRET_NAME in ${SECRETS_LIST}; do
     # Looks like JSON - validate it
     if echo "$SECRET_VALUE" | jq empty >/dev/null 2>&1; then
       log "Saving JSON config for ${SECRET_VAR_NAME}"
-      echo "$SECRET_VALUE" > "/opt/iykonect/config/${SECRET_VAR_NAME}.json"
+      echo "$SECRET_VALUE" > "/opt/iykonect/config/current/${SECRET_VAR_NAME}.json"
+      cp "/opt/iykonect/config/current/${SECRET_VAR_NAME}.json" "/opt/iykonect/config/history/${SECRET_VAR_NAME}.json.${TIMESTAMP}"
       # Safely merge JSON
       if jq -s '.[0] * .[1]' /opt/iykonect/config/app.json <(echo "$SECRET_VALUE") > /tmp/merged.json 2>/dev/null; then
         mv /tmp/merged.json /opt/iykonect/config/app.json
@@ -178,6 +192,7 @@ for FULL_SECRET_NAME in ${SECRETS_LIST}; do
       log "WARNING: Invalid JSON format for ${SECRET_VAR_NAME}, treating as string"
       # Only add to environment if it doesn't contain XML/HTML tags
       if ! echo "$SECRET_VALUE" | grep -q "<\|>" ; then
+        echo "# Added from AWS Secrets Manager" >> /opt/iykonect/env/app.env
         echo "${SECRET_VAR_NAME}=${SECRET_VALUE}" >> /opt/iykonect/env/app.env
       else
         log "WARNING: Secret value contains XML/HTML tags, skipping"
@@ -186,11 +201,13 @@ for FULL_SECRET_NAME in ${SECRETS_LIST}; do
   # Check if SSL key/cert
   elif [[ "$SECRET_VALUE" == *"BEGIN"* && ("$SECRET_VALUE" == *"PRIVATE KEY"* || "$SECRET_VALUE" == *"CERTIFICATE"*) ]]; then
     log "Saving PEM file for ${SECRET_VAR_NAME}"
-    echo "$SECRET_VALUE" > "/opt/iykonect/config/${SECRET_VAR_NAME}.pem"
-    chmod 600 "/opt/iykonect/config/${SECRET_VAR_NAME}.pem"
+    echo "$SECRET_VALUE" > "/opt/iykonect/config/current/${SECRET_VAR_NAME}.pem"
+    cp "/opt/iykonect/config/current/${SECRET_VAR_NAME}.pem" "/opt/iykonect/config/history/${SECRET_VAR_NAME}.pem.${TIMESTAMP}"
+    chmod 600 "/opt/iykonect/config/current/${SECRET_VAR_NAME}.pem"
   # Plain text value - add as environment variable if it doesn't contain XML/HTML
   elif ! echo "$SECRET_VALUE" | grep -q "<\|>" ; then
     log "Adding environment variable: ${SECRET_VAR_NAME}"
+    echo "# Added from AWS Secrets Manager" >> /opt/iykonect/env/app.env
     echo "${SECRET_VAR_NAME}=${SECRET_VALUE}" >> /opt/iykonect/env/app.env
   else
     log "WARNING: Secret ${SECRET_VAR_NAME} contains XML/HTML tags, skipping"
@@ -206,6 +223,24 @@ cp /opt/iykonect/env/app.env /opt/iykonect/env/app.env.bak
 grep -v "<\|>" /opt/iykonect/env/app.env.bak > /opt/iykonect/env/app.env
 chmod 600 /opt/iykonect/env/app.env
 
+# Create a manifest of all environment files
+log "Creating environment files manifest..."
+cat > "/opt/iykonect/env/manifest.${TIMESTAMP}.txt" << EOF
+Environment Configuration Manifest
+Generated: $(date)
+VM Name: ${VM_NAME}
+Resource Group: ${RESOURCE_GROUP}
+Location: ${LOCATION}
+
+Environment Files:
+$(find /opt/iykonect/env -type f -ls)
+
+Configuration Files:
+$(find /opt/iykonect/config -type f -ls)
+EOF
+
+chmod 600 "/opt/iykonect/env/manifest.${TIMESTAMP}.txt"
+
 # Display the environment file for debugging (hide sensitive values)
 log "Environment file created with the following variables (values hidden):"
 grep -v -e "^#" /opt/iykonect/env/app.env | sed 's/=.*$/=********/' | sort
@@ -213,3 +248,4 @@ grep -v -e "^#" /opt/iykonect/env/app.env | sed 's/=.*$/=********/' | sort
 log "==============================================="
 log "Secrets setup completed successfully"
 log "==============================================="
+log "A backup copy of all files has been created with timestamp: ${TIMESTAMP}"

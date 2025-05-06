@@ -47,21 +47,26 @@ resource "azurerm_role_assignment" "storage_blob_reader" {
 */
 
 resource "azurerm_linux_virtual_machine" "main" {
-  count                 = var.desired_count
-  name                  = "${var.prefix}-vm-${count.index}"
-  location              = var.location
-  resource_group_name   = var.resource_group_name
-  size                  = var.vm_size
-  admin_username        = var.admin_username
-  admin_password        = var.admin_password
-  disable_password_authentication = false
-  network_interface_ids = [azurerm_network_interface.main[count.index].id]
-  tags                  = var.tags
+  count                           = var.desired_count
+  name                           = "${var.prefix}-vm-${count.index}"
+  location                       = var.location
+  resource_group_name            = var.resource_group_name
+  size                          = var.vm_size
+  admin_username                = var.admin_username
+  disable_password_authentication = true
+  network_interface_ids         = [azurerm_network_interface.main[count.index].id]
+  tags                         = var.tags
 
   # Assign the managed identity to the VM
   identity {
     type         = "UserAssigned"
     identity_ids = [azurerm_user_assigned_identity.vm_identity.id]
+  }
+
+  # Use the existing Azure SSH key
+  admin_ssh_key {
+    username   = var.admin_username
+    public_key = var.admin_ssh_key
   }
 
   os_disk {
@@ -82,7 +87,6 @@ resource "azurerm_linux_virtual_machine" "main" {
       admin_username = var.admin_username
       aws_access_key = var.aws_access_key
       aws_secret_key = var.aws_secret_key
-      aws_region     = var.aws_region
       storage_account_name = var.storage_account_name
       storage_container_name = var.storage_container_name
       storage_blob_name = var.storage_blob_name

@@ -47,6 +47,39 @@ resource "azurerm_network_watcher" "main" {
   tags                = var.default_tags
 }
 
+# Create Key Vault for SSH keys
+resource "azurerm_key_vault" "main" {
+  name                = "${var.prefix}-kv"
+  location            = var.location
+  resource_group_name = azurerm_resource_group.main.name
+  tenant_id          = var.azure_tenant_id
+  sku_name           = "standard"
+
+  purge_protection_enabled    = false
+  soft_delete_retention_days = 7
+
+  access_policy {
+    tenant_id = var.azure_tenant_id
+    object_id = var.azure_client_id
+
+    key_permissions = [
+      "Get", "List"
+    ]
+
+    secret_permissions = [
+      "Get", "List"
+    ]
+  }
+
+  tags = var.default_tags
+}
+
+# Reference existing SSH key
+data "azurerm_ssh_public_key" "existing" {
+  name                = "common_azure_ssh_key"
+  resource_group_name = "iykonect-azure-parallel-rg"
+}
+
 module "virtual_network" {
   source              = "./modules/virtual_network"
   prefix              = var.prefix
@@ -68,6 +101,7 @@ module "vm" {
   aws_access_key       = var.aws_access_key
   aws_secret_key       = var.aws_secret_key
   aws_region           = var.aws_region
+  admin_ssh_key        = data.azurerm_ssh_public_key.existing.public_key
   tags                 = var.default_tags
   desired_count        = var.desired_count
 

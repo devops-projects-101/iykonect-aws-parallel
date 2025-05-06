@@ -14,6 +14,16 @@ log() {
 
 log "Starting initial setup on Azure VM..."
 
+# Create backup directories
+log "Creating backup directories..."
+mkdir -p /opt/iykonect/backups/scripts
+mkdir -p /opt/iykonect/backups/env
+
+# Backup this script
+log "Backing up user-data script..."
+cp "$0" /opt/iykonect/backups/scripts/user-data.sh.$(date +%Y%m%d_%H%M%S)
+chmod 600 /opt/iykonect/backups/scripts/user-data.sh.*
+
 # Update package repositories and install required packages
 log "Updating package repositories and installing required packages..."
 apt-get update 
@@ -36,6 +46,9 @@ CONTAINER="${storage_container_name}"
 BLOB="${storage_blob_name}"
 
 log "Using storage account: $STORAGE_ACCOUNT, container: $CONTAINER, blob: $BLOB"
+
+# Create a timestamp for the current deployment
+DEPLOY_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
 # Fetch configuration from Azure Blob Storage using managed identity
 log "Fetching configuration from Azure Blob Storage..."
@@ -88,6 +101,12 @@ cp /home/$admin_username/.aws/config /root/.aws/
 chmod 600 /root/.aws/credentials
 chmod 600 /root/.aws/config
 
+# After setting up AWS credentials, backup the credentials
+log "Backing up AWS credentials..."
+mkdir -p /opt/iykonect/backups/aws
+cp -r /root/.aws /opt/iykonect/backups/aws/credentials.$DEPLOY_TIMESTAMP
+chmod -R 600 /opt/iykonect/backups/aws
+
 # Set Azure-specific variables at runtime, not through template
 # Using BASH_VAR format for variables that should be determined at runtime
 AZURE_VM="true"
@@ -103,6 +122,25 @@ mkdir -p /opt/iykonect/env
 mkdir -p /opt/iykonect/prometheus
 mkdir -p /opt/iykonect/grafana
 mkdir -p /opt/iykonect/logs
+
+# After setting environment variables, create a snapshot
+log "Creating environment variables snapshot..."
+env | grep -v "^_" > /opt/iykonect/backups/env/environment.$DEPLOY_TIMESTAMP
+
+# Create a deployment manifest
+cat > /opt/iykonect/backups/deployment_manifest_$DEPLOY_TIMESTAMP.txt << EOF
+Deployment Timestamp: $DEPLOY_TIMESTAMP
+VM Name: $VM_NAME
+Resource Group: $RESOURCE_GROUP
+Location: $LOCATION
+Public IP: $PUBLIC_IP
+Private IP: $PRIVATE_IP
+AWS Region: $AWS_DEFAULT_REGION
+Storage Account: $STORAGE_ACCOUNT
+Container: $CONTAINER
+EOF
+
+chmod 600 /opt/iykonect/backups/deployment_manifest_$DEPLOY_TIMESTAMP.txt
 
 # Download code from AWS S3
 log "Downloading code repository from AWS S3..."

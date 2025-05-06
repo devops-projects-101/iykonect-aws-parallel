@@ -37,6 +37,11 @@ variable "admin_password" {
   default     = null
 }
 
+variable "admin_ssh_key" {
+  description = "SSH public key data for VM access"
+  type        = string
+}
+
 variable "backend_pool_id" {
   description = "ID of the Backend Address Pool (Load Balancer or Application Gateway)"
   type        = string
