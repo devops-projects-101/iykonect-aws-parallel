@@ -146,6 +146,37 @@ jobs:
         ARM_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
         ARM_TENANT_ID: ${{ secrets.ARM_TENANT_ID }}
       run: |
+        # Extract resource group name from Terraform configuration
+        RESOURCE_GROUP_NAME=$(grep -E 'prefix.*=.*".*"' terraform.tfvars | sed 's/.*"\(.*\)".*/\1/')-rg
+        
+        echo "Deleting existing resource group $RESOURCE_GROUP_NAME before applying new infrastructure..."
+        az group delete --name $RESOURCE_GROUP_NAME --yes --no-wait || true
+        
+        # Wait for the resource group to be deleted (up to 15 minutes)
+        echo "Waiting for resource group deletion to complete... This may take several minutes."
+        TIMEOUT=900  # 15 minutes in seconds
+        start_time=$(date +%s)
+        
+        while true; do
+          # Check if the resource group still exists
+          if ! az group show --name $RESOURCE_GROUP_NAME &> /dev/null; then
+            echo "Resource group has been successfully deleted."
+            break
+          fi
+          
+          # Check if we've timed out
+          current_time=$(date +%s)
+          elapsed_time=$((current_time - start_time))
+          
+          if [ $elapsed_time -ge $TIMEOUT ]; then
+            echo "Warning: Timed out waiting for resource group deletion. Proceeding anyway..."
+            break
+          fi
+          
+          echo "Resource group is still being deleted, waiting 30 seconds... (${elapsed_time}s elapsed)"
+          sleep 30
+        done
+        
         echo "Applying Azure infrastructure changes via manual trigger..."
         terraform apply -var-file=terraform.tfvars -auto-approve
 
