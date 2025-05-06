@@ -38,9 +38,8 @@ resource "azurerm_user_assigned_identity" "vm_identity" {
   tags                = var.tags
 }
 
-# Grant the managed identity access to the storage account - only if storage account ID is provided
+# Grant the managed identity access to the storage account
 resource "azurerm_role_assignment" "storage_blob_reader" {
-  count                = var.storage_account_id != "" ? 1 : 0
   scope                = "${var.storage_account_id}/blobServices/default/containers/${var.storage_container_name}"
   role_definition_name = "Storage Blob Data Reader"
   principal_id         = azurerm_user_assigned_identity.vm_identity.principal_id
