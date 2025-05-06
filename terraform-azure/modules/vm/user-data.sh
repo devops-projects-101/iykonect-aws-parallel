@@ -31,11 +31,11 @@ apt-get install -y \
     azure-cli
 
 # Set up variables for Azure Storage configuration
-STORAGE_ACCOUNT="iykonectazurestore"
-CONTAINER="iykonect-azure-config"
-BLOB="iykonectazureconfigblob"
+STORAGE_ACCOUNT="${storage_account_name}"
+CONTAINER="${storage_container_name}"
+BLOB="${storage_blob_name}"
 
-
+log "Using storage account: $STORAGE_ACCOUNT, container: $CONTAINER, blob: $BLOB"
 
 # Fetch configuration from Azure Blob Storage using managed identity
 log "Fetching configuration from Azure Blob Storage..."

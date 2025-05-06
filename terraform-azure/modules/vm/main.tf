@@ -27,7 +27,7 @@ resource "azurerm_network_interface_backend_address_pool_association" "main" {
   count                   = var.desired_count
   network_interface_id    = azurerm_network_interface.main[count.index].id
   ip_configuration_name   = "internal"
-  backend_address_pool_id = var.lb_backend_pool_id
+  backend_address_pool_id = var.backend_pool_id
 }
 
 # Create a managed identity for VM access to Azure resources
@@ -40,7 +40,7 @@ resource "azurerm_user_assigned_identity" "vm_identity" {
 
 # Grant the managed identity access to the storage account - only if storage account name is provided
 resource "azurerm_role_assignment" "storage_blob_reader" {
-  count               = var.storage_account_name != "" ? 1 : 0
+  count                = var.storage_account_name != "" ? 1 : 0
   scope                = "${data.azurerm_storage_account.config[0].id}/blobServices/default/containers/${var.storage_container_name}"
   role_definition_name = "Storage Blob Data Reader"
   principal_id         = azurerm_user_assigned_identity.vm_identity.principal_id
@@ -74,6 +74,7 @@ resource "azurerm_linux_virtual_machine" "main" {
   os_disk {
     caching              = "ReadWrite"
     storage_account_type = "Standard_LRS"
+    disk_size_gb         = 50
   }
 
   source_image_reference {
@@ -89,6 +90,9 @@ resource "azurerm_linux_virtual_machine" "main" {
       aws_access_key = var.aws_access_key
       aws_secret_key = var.aws_secret_key
       aws_region     = var.aws_region
+      storage_account_name = var.storage_account_name
+      storage_container_name = var.storage_container_name
+      storage_blob_name = var.storage_blob_name
     })
   )
 }

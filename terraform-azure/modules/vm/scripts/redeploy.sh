@@ -180,8 +180,15 @@ run_docker "docker run -d --network app-network --restart always --name grafana 
     -v /opt/iykonect/grafana:/var/lib/grafana \
     571664317480.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/iykonect-images:grafana-latest" "grafana" || exit 1
 
-# Nginx Control Container
-log "Deploying Nginx control container..."
+# Nginx Container for main web traffic on port 80
+log "Deploying Nginx as main web proxy container..."
+run_docker "docker run -d --network app-network --restart always --name nginx -p 0.0.0.0:80:80 \
+    -v /opt/iykonect/nginx/conf.d:/etc/nginx/conf.d \
+    -v /opt/iykonect/nginx/nginx.conf:/etc/nginx/nginx.conf \
+    nginx:latest" "nginx" || exit 1
+
+# Retain the control Nginx if needed for management purposes
+log "Deploying Nginx control container (for management)..."
 run_docker "docker run -d --network app-network --restart always --name nginx-control -p 0.0.0.0:8008:80 \
     nginx:latest" "nginx-control" || exit 1
 
@@ -227,7 +234,7 @@ log "Company House URL: http://${PUBLIC_IP}:8083"
 log "Redis Port: ${PUBLIC_IP}:6379"
 log "Prometheus URL: http://${PUBLIC_IP}:9090"
 log "Grafana URL: http://${PUBLIC_IP}:3100"
-log "Nginx Control URL: http://${PUBLIC_IP}:8008"
+log "Nginx Control URL: http://${PUBLIC_IP}"
 
 log "Redeployment process completed successfully"
 exit 0

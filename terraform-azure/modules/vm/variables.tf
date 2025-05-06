@@ -37,8 +37,8 @@ variable "admin_password" {
   default     = null
 }
 
-variable "lb_backend_pool_id" {
-  description = "ID of the Load Balancer Backend Address Pool"
+variable "backend_pool_id" {
+  description = "ID of the Backend Address Pool (Load Balancer or Application Gateway)"
   type        = string
 }
 

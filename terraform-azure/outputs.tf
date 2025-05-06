@@ -8,12 +8,27 @@ output "virtual_network_name" {
   value       = module.virtual_network.vnet_name
 }
 
-output "load_balancer_ip" {
-  description = "Public IP address of the Azure Load Balancer"
-  value       = module.load_balancer.public_ip_address
+output "application_gateway_ip" {
+  description = "Public IP address of the Azure Application Gateway"
+  value       = module.application_gateway.public_ip
 }
 
-output "vm_ips" {
+output "application_gateway_url" {
+  description = "URL for the Application Gateway"
+  value       = "http://${module.application_gateway.public_ip}"
+}
+
+output "nginx_url" {
+  description = "URL for Nginx running on port 80"
+  value       = "http://${module.vm.vm_public_ips[0]}"
+}
+
+output "vm_public_ips" {
+  description = "Public IP addresses of the Azure VMs"
+  value       = module.vm.vm_public_ips
+}
+
+output "vm_private_ips" {
   description = "Private IP addresses of the Azure VMs"
   value       = module.vm.vm_private_ips
 }
@@ -23,38 +38,31 @@ output "ssh_command" {
   value       = module.vm.ssh_command
 }
 
-# # Docker URL outputs
-# output "docker_registry_endpoint" {
-#   description = "URL for Docker Registry if deployed"
-#   value       = module.vm.docker_registry_endpoint
-# }
-
-# output "docker_api_endpoint" {
-#   description = "Docker API endpoint"
-#   value       = module.vm.docker_api_endpoint
-# }
-
-# output "docker_api_tls_endpoint" {
-#   description = "Docker API TLS endpoint"
-#   value       = module.vm.docker_api_tls_endpoint
-# }
-
-# output "docker_container_urls" {
-#   description = "Map of container names to their URLs"
-#   value       = module.vm.docker_container_urls
-# }
-
-# Load balancer container URLs
-output "load_balancer_container_urls" {
-  description = "Map of container names to their load balancer URLs"
+# Service URLs via Nginx
+output "service_urls" {
+  description = "Map of service paths to their URLs via Nginx"
   value = {
-    api           = "http://${module.load_balancer.public_ip_address}:8000"
-    web           = "http://${module.load_balancer.public_ip_address}:3000"
-    signable      = "http://${module.load_balancer.public_ip_address}:8082"
-    email_server  = "http://${module.load_balancer.public_ip_address}:8025"
-    company_house = "http://${module.load_balancer.public_ip_address}:8083"
-    prometheus    = "http://${module.load_balancer.public_ip_address}:9090"
-    grafana       = "http://${module.load_balancer.public_ip_address}:3100"
-    nginx_control = "http://${module.load_balancer.public_ip_address}:8008"
+    main_url      = "http://${module.vm.vm_public_ips[0]}"
+    api           = "http://${module.vm.vm_public_ips[0]}/api"
+    signable      = "http://${module.vm.vm_public_ips[0]}/signable"
+    email_server  = "http://${module.vm.vm_public_ips[0]}/email"
+    company_house = "http://${module.vm.vm_public_ips[0]}/company-house"
+    prometheus    = "http://${module.vm.vm_public_ips[0]}/prometheus"
+    grafana       = "http://${module.vm.vm_public_ips[0]}/grafana"
+  }
+}
+
+# Direct container URLs (for internal/debug use)
+output "direct_container_urls" {
+  description = "Map of container names to their direct URLs"
+  value = {
+    api           = "http://${module.vm.vm_public_ips[0]}:8000"
+    web           = "http://${module.vm.vm_public_ips[0]}:3000"
+    signable      = "http://${module.vm.vm_public_ips[0]}:8082"
+    email_server  = "http://${module.vm.vm_public_ips[0]}:8025"
+    company_house = "http://${module.vm.vm_public_ips[0]}:8083"
+    prometheus    = "http://${module.vm.vm_public_ips[0]}:9090"
+    grafana       = "http://${module.vm.vm_public_ips[0]}:3100"
+    nginx_control = "http://${module.vm.vm_public_ips[0]}:8008"
   }
 }
