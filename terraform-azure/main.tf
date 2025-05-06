@@ -55,18 +55,7 @@ module "virtual_network" {
   tags                = var.default_tags
 }
 
-# First create the application gateway without backend IPs
-module "application_gateway" {
-  source               = "./modules/application_gateway"
-  prefix               = var.prefix
-  resource_group_name  = azurerm_resource_group.main.name
-  location             = var.location
-  subnet_id            = module.virtual_network.appgw_subnet_id
-  tags                 = var.default_tags
-  # We'll create the VMs first and then update the Application Gateway with their IPs
-  backend_vm_ip_addresses = []
-}
-
+# Create VM first to get IP addresses
 module "vm" {
   source               = "./modules/vm"
   prefix               = var.prefix
@@ -76,7 +65,6 @@ module "vm" {
   vm_size              = "Standard_D4s_v3"  # 4 vCPUs, 16 GB RAM
   admin_username       = var.admin_username
   admin_password       = var.admin_password
-  # Remove the backend_pool_id from VM module since we're not using it anymore
   aws_access_key       = var.aws_access_key
   aws_secret_key       = var.aws_secret_key
   aws_region           = var.aws_region
@@ -89,11 +77,14 @@ module "vm" {
   storage_blob_name      = azurerm_storage_blob.vm_config.name
 }
 
-# Create a separate resource to update the application gateway with VM IPs
-resource "azurerm_application_gateway_backend_address_pool" "vm_pool" {
-  name                = "vm-backend-pool"
-  resource_group_name = azurerm_resource_group.main.name
-  application_gateway_name = module.application_gateway.appgw_name
-  ip_addresses        = module.vm.vm_private_ips
-  depends_on          = [module.vm, module.application_gateway]
+# Then create Application Gateway with VM IP addresses
+module "application_gateway" {
+  source               = "./modules/application_gateway"
+  prefix               = var.prefix
+  resource_group_name  = azurerm_resource_group.main.name
+  location             = var.location
+  subnet_id            = module.virtual_network.appgw_subnet_id
+  backend_vm_ip_addresses = module.vm.vm_private_ips
+  tags                 = var.default_tags
+  depends_on           = [module.vm]
 }
