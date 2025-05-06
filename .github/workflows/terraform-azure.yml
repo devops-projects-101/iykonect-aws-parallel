@@ -65,12 +65,12 @@ jobs:
 
         # Check if storage account exists, create if not
         # Using a valid storage account name (lowercase, no hyphens, under 24 chars)
-        az storage account show --name iykonectazurestore --resource-group iykonect-azure-parallel-rg 2>/dev/null || \
-        az storage account create --name iykonectazurestore --resource-group iykonect-azure-parallel-rg --location westeurope --sku Standard_LRS --kind StorageV2
+        az storage account show --name devopsiykonectazurestore --resource-group iykonect-azure-parallel-rg 2>/dev/null || \
+        az storage account create --name devopsiykonectazurestore --resource-group iykonect-azure-parallel-rg --location westeurope --sku Standard_LRS --kind StorageV2
 
         # Check if container exists, create if not
-        az storage container show --name iykonectazureblob --account-name iykonectazurestore 2>/dev/null || \
-        az storage container create --name iykonectazureblob --account-name iykonectazurestore --auth-mode login
+        az storage container show --name devopsiykonectazureblob --account-name devopsiykonectazurestore 2>/dev/null || \
+        az storage container create --name devopsiykonectazureblob --account-name devopsiykonectazurestore --auth-mode login
 
     - name: Setup Terraform
       uses: hashicorp/setup-terraform@v2

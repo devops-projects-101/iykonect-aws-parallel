@@ -30,6 +30,27 @@ resource "azurerm_network_interface_backend_address_pool_association" "main" {
   backend_address_pool_id = var.lb_backend_pool_id
 }
 
+# Create a managed identity for VM access to Azure resources
+resource "azurerm_user_assigned_identity" "vm_identity" {
+  name                = "${var.prefix}-vm-identity"
+  resource_group_name = var.resource_group_name
+  location            = var.location
+  tags                = var.tags
+}
+
+# Grant the managed identity access to the storage account
+resource "azurerm_role_assignment" "storage_blob_reader" {
+  scope                = "${data.azurerm_storage_account.config.id}/blobServices/default/containers/${var.storage_container_name}"
+  role_definition_name = "Storage Blob Data Reader"
+  principal_id         = azurerm_user_assigned_identity.vm_identity.principal_id
+}
+
+# Data source to get storage account details
+data "azurerm_storage_account" "config" {
+  name                = var.storage_account_name
+  resource_group_name = var.resource_group_name
+}
+
 resource "azurerm_linux_virtual_machine" "main" {
   count                 = var.desired_count
   name                  = "${var.prefix}-vm-${count.index}"
@@ -41,6 +62,12 @@ resource "azurerm_linux_virtual_machine" "main" {
   disable_password_authentication = false
   network_interface_ids = [azurerm_network_interface.main[count.index].id]
   tags                  = var.tags
+
+  # Assign the managed identity to the VM
+  identity {
+    type         = "UserAssigned"
+    identity_ids = [azurerm_user_assigned_identity.vm_identity.id]
+  }
 
   os_disk {
     caching              = "ReadWrite"

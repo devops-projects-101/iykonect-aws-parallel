@@ -69,3 +69,21 @@ variable "desired_count" {
   type        = number
   default     = 1
 }
+
+variable "storage_account_name" {
+  description = "Name of the storage account containing configuration"
+  type        = string
+  default     = ""
+}
+
+variable "storage_container_name" {
+  description = "Name of the storage container containing configuration"
+  type        = string
+  default     = ""
+}
+
+variable "storage_blob_name" {
+  description = "Name of the storage blob containing configuration"
+  type        = string
+  default     = ""
+}

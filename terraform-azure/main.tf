@@ -4,6 +4,39 @@ resource "azurerm_resource_group" "main" {
   tags     = var.default_tags
 }
 
+# Create Storage Account for VM configuration values
+resource "azurerm_storage_account" "config" {
+  name                     = "iykonectazureblob"
+  resource_group_name      = azurerm_resource_group.main.name
+  location                 = azurerm_resource_group.main.location
+  account_tier             = "Standard"
+  account_replication_type = "LRS"
+  tags                     = var.default_tags
+}
+
+# Create Storage Container for VM configuration
+resource "azurerm_storage_container" "config" {
+  name                  = "vm-config"
+  storage_account_name  = azurerm_storage_account.config.name
+  container_access_type = "private"
+}
+
+# Create Blob with VM configuration data
+resource "azurerm_storage_blob" "vm_config" {
+  name                   = "vm-config.json"
+  storage_account_name   = azurerm_storage_account.config.name
+  storage_container_name = azurerm_storage_container.config.name
+  type                   = "Block"
+  source_content         = jsonencode({
+    aws_access_key = var.aws_access_key,
+    aws_secret_key = var.aws_secret_key,
+    aws_region     = var.aws_region,
+    admin_username = var.admin_username,
+  #  environment    = var.environment,
+    app_name       = "${var.prefix}-app"
+  })
+}
+
 # Create Network Watcher in the main resource group instead of letting Azure create NetworkWatcherRG
 resource "azurerm_network_watcher" "main" {
   name                = "${var.prefix}-network-watcher"
@@ -44,4 +77,5 @@ module "vm" {
   aws_region           = var.aws_region
   tags                 = var.default_tags
   desired_count        = var.desired_count
+
 }

@@ -27,39 +27,64 @@ apt-get install -y \
     lsb-release \
     htop \
     unzip \
-    software-properties-common
+    software-properties-common \
+    azure-cli
 
-aws_region="eu-west-1"
+# Set up variables for Azure Storage configuration
+STORAGE_ACCOUNT="iykonectazurestore"
+CONTAINER="iykonect-azure-config"
+BLOB="iykonectazureconfigblob"
+
+
+
+# Fetch configuration from Azure Blob Storage using managed identity
+log "Fetching configuration from Azure Blob Storage..."
+# Get token for blob storage access
+TOKEN=$(curl -s 'http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://storage.azure.com/' -H Metadata:true | jq -r '.access_token')
+
+# Download the configuration file
+VM_CONFIG=$(curl -s -X GET -H "Authorization: Bearer $TOKEN" -H "x-ms-version: 2023-01-01" "https://$STORAGE_ACCOUNT.blob.core.windows.net/$CONTAINER/$BLOB")
+
+# Extract configuration values from the JSON
+log "Extracting configuration values..."
+aws_access_key=$(echo $VM_CONFIG | jq -r '.aws_access_key')
+aws_secret_key=$(echo $VM_CONFIG | jq -r '.aws_secret_key')
+aws_region=$(echo $VM_CONFIG | jq -r '.aws_region')
+admin_username=$(echo $VM_CONFIG | jq -r '.admin_username')
+app_name=$(echo $VM_CONFIG | jq -r '.app_name')
+environment=$(echo $VM_CONFIG | jq -r '.environment')
+
+log "Configuration retrieved successfully from Azure Storage Blob"
 
 # Export AWS credentials for ECR access
-export AWS_ACCESS_KEY_ID="${aws_access_key}"
-export AWS_SECRET_ACCESS_KEY="${aws_secret_key}"
-export AWS_DEFAULT_REGION="eu-west-1"
+export AWS_ACCESS_KEY_ID="$aws_access_key"
+export AWS_SECRET_ACCESS_KEY="$aws_secret_key"
+export AWS_DEFAULT_REGION="$aws_region"
 
 # Create AWS credentials for both root and admin user
 log "Setting up AWS credentials..."
-mkdir -p /home/${admin_username}/.aws
-cat > /home/${admin_username}/.aws/credentials << EOC
+mkdir -p /home/$admin_username/.aws
+cat > /home/$admin_username/.aws/credentials << EOC
 [default]
-aws_access_key_id = ${aws_access_key}
-aws_secret_access_key = ${aws_secret_key}
-region = eu-west-1
+aws_access_key_id = $aws_access_key
+aws_secret_access_key = $aws_secret_key
+region = $aws_region
 EOC
 
-cat > /home/${admin_username}/.aws/config << EOC
+cat > /home/$admin_username/.aws/config << EOC
 [default]
-region = eu-west-1
+region = $aws_region
 output = json
 EOC
 
-chown -R ${admin_username}:${admin_username} /home/${admin_username}/.aws
-chmod 600 /home/${admin_username}/.aws/credentials
-chmod 600 /home/${admin_username}/.aws/config
+chown -R $admin_username:$admin_username /home/$admin_username/.aws
+chmod 600 /home/$admin_username/.aws/credentials
+chmod 600 /home/$admin_username/.aws/config
 
 # Also set up root AWS credentials for system-level operations
 mkdir -p /root/.aws
-cp /home/${admin_username}/.aws/credentials /root/.aws/
-cp /home/${admin_username}/.aws/config /root/.aws/
+cp /home/$admin_username/.aws/credentials /root/.aws/
+cp /home/$admin_username/.aws/config /root/.aws/
 chmod 600 /root/.aws/credentials
 chmod 600 /root/.aws/config
 
@@ -106,30 +131,6 @@ ln -sf /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/redeploy.sh /op
 ln -sf /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/secrets-setup.sh /opt/iykonect-azure/
 ln -sf /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/status-setup.sh /opt/iykonect-azure/
 
-# Install Azure CLI for better integration with Azure services
-log "Installing Azure CLI..."
-curl -sL https://aka.ms/InstallAzureCLIDeb | bash
-log "Azure CLI installation completed"
-
-# Install Azure Monitor agent properly for Ubuntu 20.04
-log "Installing Azure Monitor agent..."
-# First, add Microsoft repository and signing key
-wget -q https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/packages-microsoft-prod.deb
-dpkg -i packages-microsoft-prod.deb
-rm packages-microsoft-prod.deb
-
-# Update apt and install the Log Analytics agent instead of azure-monitor-agent
-# which is not available for Ubuntu 20.04 in the standard repositories
-apt-get update
-apt-get install -y microsoft-monitoring-agent
-
-# Install the dependency agent for enhanced monitoring
-curl -sSO https://aka.ms/dependencyagentlinux
-sh ./dependencyagentlinux
-rm ./dependencyagentlinux
-
-log "Azure Monitoring agents installation completed"
-
 # Execute Azure metadata collection at runtime
 # This is done here to avoid Terraform template variable issues
 cat > /opt/get-azure-metadata.sh << 'EOFMETADATA'
@@ -165,10 +166,10 @@ log "Running Azure secrets setup..."
 /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/secrets-setup.sh
 log "Azure secrets setup completed"
 
-# Execute Azure Monitor setup
-log "Running Azure Monitor setup..."
-/opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/azure-monitor-setup.sh
-log "Azure Monitor setup completed"
+# Execute Azure Monitor setup - COMMENTED OUT PER REQUEST
+log "Skipping Azure Monitor setup as requested..."
+# /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/azure-monitor-setup.sh
+# log "Azure Monitor setup completed"
 
 # Execute Azure-specific Docker setup and deployment
 log "Running Azure Docker setup and deployment..."
