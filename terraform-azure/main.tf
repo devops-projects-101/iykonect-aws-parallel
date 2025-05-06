@@ -49,7 +49,7 @@ resource "azurerm_network_watcher" "main" {
 
 # Create Key Vault for SSH keys
 resource "azurerm_key_vault" "main" {
-  name                = "${var.prefix}-kv"
+  name                = "iykonectkv"
   location            = var.location
   resource_group_name = azurerm_resource_group.main.name
   tenant_id          = var.azure_tenant_id
