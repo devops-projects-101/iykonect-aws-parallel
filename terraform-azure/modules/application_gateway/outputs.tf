@@ -1,6 +1,6 @@
 output "backend_pool_id" {
   description = "ID of the Application Gateway's Backend Address Pool"
-  value       = azurerm_application_gateway.main.backend_address_pool[0].id
+  value       = [for pool in azurerm_application_gateway.main.backend_address_pool : pool.id if pool.name == var.backend_address_pool_name][0]
 }
 
 output "public_ip" {
