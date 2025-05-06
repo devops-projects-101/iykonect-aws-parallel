@@ -131,7 +131,7 @@ jobs:
     #     terraform apply -var-file=terraform.tfvars -auto-approve
 
     - name: Apply Azure Infrastructure Changes (Manual Trigger)
-      # if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'create_azure_infra'
+      if: github.event_name == 'workflow_dispatch' && github.event.inputs.action == 'create_azure_infra'
       env:
         TF_VAR_aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
         TF_VAR_aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}

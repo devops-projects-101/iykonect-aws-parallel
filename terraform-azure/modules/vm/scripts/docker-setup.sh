@@ -47,6 +47,20 @@ systemctl start docker
 log "Setting up Docker environment..."
 docker system prune -af
 
+# Create necessary directories for application
+log "Creating application directories..."
+mkdir -p /opt/iykonect/config
+mkdir -p /opt/iykonect/env
+mkdir -p /opt/iykonect/prometheus
+mkdir -p /opt/iykonect/grafana
+mkdir -p /opt/iykonect/logs
+mkdir -p /opt/iykonect/nginx/conf.d
+
+# Copy Nginx configuration files from scripts directory
+log "Copying Nginx configuration files..."
+cp /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/nginx.conf /opt/iykonect/nginx/
+cp /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/default.conf /opt/iykonect/nginx/conf.d/
+
 # Ensure the scripts are executable
 log "Setting execute permissions on scripts..."
 chmod +x /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/container-health-check.sh
