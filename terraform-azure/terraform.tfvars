@@ -1,5 +1,5 @@
 # Azure Configuration
-prefix          = "iykonect-azure-infra"
+prefix          = "iykonect-infrastucture"
 location        = "West Europe"
 vm_size         = "Standard_B2s"
 admin_username  = "azure"
@@ -8,7 +8,8 @@ desired_count   = 1
 
 # Default tags
 default_tags = {
-  ManagedBy   = "Terraform"
+  ManagedBy   = "DevOps"
   Project     = "iykonect"
   Environment = "production"
+  ProvisionedBy  = "Terraform"
 }

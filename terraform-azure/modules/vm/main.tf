@@ -38,12 +38,17 @@ resource "azurerm_user_assigned_identity" "vm_identity" {
   tags                = var.tags
 }
 
-# Grant the managed identity access to the storage account
+# Comment out the role assignment since our service principal doesn't have permission
+# to create role assignments. Instead, we'll use a different approach for storage access.
+# NOTE: You'll need to manually assign this role in Azure Portal or via Azure CLI if you need
+# this functionality, or use a service principal with more permissions.
+/*
 resource "azurerm_role_assignment" "storage_blob_reader" {
   scope                = "${var.storage_account_id}/blobServices/default/containers/${var.storage_container_name}"
   role_definition_name = "Storage Blob Data Reader"
   principal_id         = azurerm_user_assigned_identity.vm_identity.principal_id
 }
+*/
 
 resource "azurerm_linux_virtual_machine" "main" {
   count                 = var.desired_count
