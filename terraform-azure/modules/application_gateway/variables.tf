@@ -70,3 +70,9 @@ variable "gateway_ip_configuration_name" {
   type        = string
   default     = "gateway-ip-config"
 }
+
+variable "backend_vm_ip_addresses" {
+  description = "List of VM IP addresses to add to the backend pool"
+  type        = list(string)
+  default     = []
+}

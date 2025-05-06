@@ -35,7 +35,8 @@ resource "azurerm_application_gateway" "main" {
   }
 
   backend_address_pool {
-    name = var.backend_address_pool_name
+    name         = var.backend_address_pool_name
+    ip_addresses = var.backend_vm_ip_addresses
   }
 
   backend_http_settings {

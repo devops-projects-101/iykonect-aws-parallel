@@ -23,12 +23,8 @@ resource "azurerm_network_interface" "main" {
   }
 }
 
-resource "azurerm_network_interface_backend_address_pool_association" "main" {
-  count                   = var.desired_count
-  network_interface_id    = azurerm_network_interface.main[count.index].id
-  ip_configuration_name   = "internal"
-  backend_address_pool_id = var.backend_pool_id
-}
+# Remove the backend address pool association since it's incompatible with Application Gateway
+# We will manually register the VM's IP with the Application Gateway instead
 
 # Create a managed identity for VM access to Azure resources
 resource "azurerm_user_assigned_identity" "vm_identity" {

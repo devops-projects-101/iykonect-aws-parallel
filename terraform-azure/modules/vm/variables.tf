@@ -40,6 +40,7 @@ variable "admin_password" {
 variable "backend_pool_id" {
   description = "ID of the Backend Address Pool (Load Balancer or Application Gateway)"
   type        = string
+  default     = ""
 }
 
 variable "aws_access_key" {
