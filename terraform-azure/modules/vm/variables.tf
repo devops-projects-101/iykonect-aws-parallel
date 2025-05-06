@@ -70,6 +70,12 @@ variable "desired_count" {
   default     = 1
 }
 
+variable "storage_account_id" {
+  description = "ID of the storage account containing configuration"
+  type        = string
+  default     = ""
+}
+
 variable "storage_account_name" {
   description = "Name of the storage account containing configuration"
   type        = string
