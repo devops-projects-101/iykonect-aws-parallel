@@ -128,17 +128,13 @@ resource "azurerm_dns_ns_record" "parallel_delegation" {
 }
 
 # Retrieve the Public IP associated with the Application Gateway
-# IMPORTANT: You MUST verify how your application_gateway module outputs the Public IP information.
-# Adjust the 'name' and 'resource_group_name' attributes below based on your module's output.
-# A common pattern is for the module to output the Public IP resource ID.
-# If your module outputs the ID as 'appgw_public_ip_id', you would use:
-# id = module.application_gateway.appgw_public_ip_id
+# The name uses the correct naming convention from the module (${var.prefix}-appgw-pip)
 data "azurerm_public_ip" "appgw_public_ip" {
-  # Assuming your application gateway module creates a public IP with a name
-  # following a convention like "${var.prefix}-appgw-public-ip" in the main RG.
-  # **VERIFY THIS NAMING CONVENTION AND RESOURCE GROUP IN YOUR module.application_gateway**
-  name                = "${var.prefix}-appgw-public-ip"
+  name                = "${var.prefix}-appgw-pip"
   resource_group_name = azurerm_resource_group.main.name
+  
+  # Ensure this data source is only read after the application gateway is created
+  depends_on = [module.application_gateway]
 }
 
 # Create an A record in the delegated subdomain DNS zone
