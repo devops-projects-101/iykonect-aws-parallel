@@ -178,7 +178,7 @@ jobs:
         # done
         
 
-        terraform destroy -target=module.vm.azurerm_linux_virtual_machine.main -auto-approve
+        #terraform destroy -target=module.vm.azurerm_linux_virtual_machine.main -auto-approve
 
 
         echo "Applying Azure infrastructure changes via manual trigger..."
