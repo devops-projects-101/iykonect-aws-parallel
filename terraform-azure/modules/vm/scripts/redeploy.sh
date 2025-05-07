@@ -109,15 +109,38 @@ run_docker() {
 
 # Pull the latest images
 log "Pulling latest images from ECR..."
+log "Pulling API image..."
 docker pull 571664317480.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/iykonect-images:api-latest
+log "Pulled API image"
+log "Pulling Web image..."
 docker pull 571664317480.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/iykonect-images:web-latest
+log "Pulled Web image"
+log "Pulling Signable image..."
 docker pull 571664317480.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/iykonect-images:signable-latest
+log "Pulled Signable image"
+log "Pulling Email Server image..."
 docker pull 571664317480.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/iykonect-images:email-server-latest
+log "Pulled Email Server image"
+log "Pulling Company House image..."
 docker pull 571664317480.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/iykonect-images:company-house-latest
+log "Pulled Company House image"
+log "Pulling Redis image..."
 docker pull 571664317480.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/iykonect-images:redis-latest
+log "Pulled Redis image"
+log "Pulling Prometheus image..."
 docker pull 571664317480.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/iykonect-images:prometheus-latest
+log "Pulled Prometheus image"
+log "Pulling Grafana image..."
 docker pull 571664317480.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/iykonect-images:grafana-latest
+log "Pulled Grafana image"
+log "Pulling Nginx image..."
 docker pull nginx:latest
+log "Pulled Nginx image"
+
+
+log "Successfully pulled latest images from ECR"
+
+log "check further logs in /var/log/redeploy.log"
 
 # Deploy containers with Azure-specific configurations
 log "Deploying containers with Azure-specific configurations..."
@@ -126,66 +149,58 @@ log "Deploying containers with Azure-specific configurations..."
 log "Deploying API container..."
 run_docker "docker run -d --network app-network --restart always --name api -p 0.0.0.0:8000:80 \
     --env-file /opt/iykonect/env/app.env \
-    -v /opt/iykonect/config:/app/config \
-    -e AZURE_VM=true \
-    -e AZURE_LOCATION=$LOCATION \
-    -e AZURE_RESOURCE_GROUP=$RESOURCE_GROUP \
     571664317480.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/iykonect-images:api-latest" "api" || exit 1
 
 # Web Container
 log "Deploying Web container..."
 run_docker "docker run -d --network app-network --restart always --name web -p 0.0.0.0:3000:3000 \
     --env-file /opt/iykonect/env/app.env \
-    -v /opt/iykonect/config:/app/config \
-    -e AZURE_VM=true \
-    -e AZURE_LOCATION=$LOCATION \
-    -e AZURE_RESOURCE_GROUP=$RESOURCE_GROUP \
     571664317480.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/iykonect-images:web-latest" "web" || exit 1
 
 # Signable Container
 log "Deploying Signable container..."
 run_docker "docker run -d --network app-network --restart always --name signable -p 0.0.0.0:8082:80 \
     --env-file /opt/iykonect/env/app.env \
-    -v /opt/iykonect/config:/app/config \
-    -e AZURE_VM=true \
     571664317480.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/iykonect-images:signable-latest" "signable" || exit 1
 
 # Email Server Container
 log "Deploying Email Server container..."
 run_docker "docker run -d --network app-network --restart always --name email-server -p 0.0.0.0:8025:5001 \
     --env-file /opt/iykonect/env/app.env \
-    -v /opt/iykonect/config:/app/config \
-    -e AZURE_VM=true \
     571664317480.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/iykonect-images:email-server-latest" "email-server" || exit 1
 
 # Company House Container
 log "Deploying Company House container..."
 run_docker "docker run -d --network app-network --restart always --name company-house -p 0.0.0.0:8083:80 \
     --env-file /opt/iykonect/env/app.env \
-    -v /opt/iykonect/config:/app/config \
-    -e AZURE_VM=true \
     571664317480.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/iykonect-images:company-house-latest" "company-house" || exit 1
 
 # Redis Container
 log "Deploying Redis container..."
 run_docker "docker run -d --network app-network --restart always --name redis -p 0.0.0.0:6379:6379 \
+    --env-file /opt/iykonect/env/app.env \
     571664317480.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/iykonect-images:redis-latest" "redis" || exit 1
+
+
 
 # Prometheus Container
 log "Deploying Prometheus container..."
 run_docker "docker run -d --network app-network --restart always --name prometheus -p 0.0.0.0:9090:9090 \
+    --env-file /opt/iykonect/env/app.env \
     -v /opt/iykonect/prometheus:/etc/prometheus \
     571664317480.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/iykonect-images:prometheus-latest" "prometheus" || exit 1
 
 # Grafana Container
 log "Deploying Grafana container..."
 run_docker "docker run -d --network app-network --restart always --name grafana -p 0.0.0.0:3100:3000 \
+    --env-file /opt/iykonect/env/app.env \
     -v /opt/iykonect/grafana:/var/lib/grafana \
     571664317480.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/iykonect-images:grafana-latest" "grafana" || exit 1
 
 # Nginx Container for main web traffic on port 80
 log "Deploying Nginx as main web proxy container..."
 run_docker "docker run -d --network app-network --restart always --name nginx -p 0.0.0.0:80:80 \
+    --env-file /opt/iykonect/env/app.env \
     -v /opt/iykonect/nginx/conf.d:/etc/nginx/conf.d \
     -v /opt/iykonect/nginx/nginx.conf:/etc/nginx/nginx.conf \
     nginx:latest" "nginx" || exit 1
@@ -193,6 +208,7 @@ run_docker "docker run -d --network app-network --restart always --name nginx -p
 # Retain the control Nginx if needed for management purposes
 log "Deploying Nginx control container (for management)..."
 run_docker "docker run -d --network app-network --restart always --name nginx-control -p 0.0.0.0:8008:80 \
+    --env-file /opt/iykonect/env/app.env \
     nginx:latest" "nginx-control" || exit 1
 
 log "All containers deployed successfully"

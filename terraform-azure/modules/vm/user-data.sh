@@ -260,11 +260,6 @@ log "Running status command setup..."
 /opt/iykonect-azure/status-setup.sh
 log "Status command setup completed"
 
-# Execute Secret Manager setup
-log "Running Secrets Manager setup..."
-/opt/iykonect-azure/secrets-setup.sh
-log "Secrets Manager setup completed"
-
 # Execute Docker setup
 log "Running Docker setup and deployment..."
 /opt/iykonect-azure/docker-setup.sh
