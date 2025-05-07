@@ -87,9 +87,10 @@ resource "azurerm_linux_virtual_machine" "main" {
       admin_username = var.admin_username
       aws_access_key = var.aws_access_key
       aws_secret_key = var.aws_secret_key
-      storage_account_name = var.storage_account_name
-      storage_container_name = var.storage_container_name
-      storage_blob_name = var.storage_blob_name
+      aws_region = var.aws_region
+      # storage_account_name = var.storage_account_name
+      # storage_container_name = var.storage_container_name
+      # storage_blob_name = var.storage_blob_name
     })
   )
 }

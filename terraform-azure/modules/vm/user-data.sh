@@ -54,7 +54,9 @@ aws_region="${aws_region}"
 admin_username="${admin_username}"
 
 
-aws_region="eu-west-1"
+if [ -z "${aws_region}" ]; then
+    aws_region="eu-west-1"
+fi
 
 
 log "Configuration values set successfully"
