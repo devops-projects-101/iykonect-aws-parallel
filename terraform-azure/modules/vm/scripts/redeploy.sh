@@ -181,8 +181,6 @@ run_docker "docker run -d --network app-network --restart always --name redis -p
     --env-file /opt/iykonect/env/app.env \
     571664317480.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/iykonect-images:redis-latest" "redis" || exit 1
 
-
-
 # Prometheus Container
 log "Deploying Prometheus container..."
 run_docker "docker run -d --network app-network --restart always --name prometheus -p 0.0.0.0:9090:9090 \
@@ -194,6 +192,8 @@ run_docker "docker run -d --network app-network --restart always --name promethe
 log "Deploying Grafana container..."
 run_docker "docker run -d --network app-network --restart always --name grafana -p 0.0.0.0:3100:3000 \
     --env-file /opt/iykonect/env/app.env \
+    -e GF_SERVER_ROOT_URL=http://${PUBLIC_IP}/grafana \
+    -e GF_SERVER_SERVE_FROM_SUB_PATH=true \
     -v /opt/iykonect/grafana:/var/lib/grafana \
     571664317480.dkr.ecr.${AWS_DEFAULT_REGION}.amazonaws.com/iykonect-images:grafana-latest" "grafana" || exit 1
 

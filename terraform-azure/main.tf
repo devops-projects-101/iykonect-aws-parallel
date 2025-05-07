@@ -82,3 +82,23 @@ module "application_gateway" {
   tags                 = var.default_tags
   depends_on           = [module.vm]
 }
+
+# Consolidated DNS zone and delegation for parallel subdomain
+data "azurerm_dns_zone" "parent" {
+  name                = var.parent_dns_zone_name
+  resource_group_name = var.parent_dns_zone_resource_group
+}
+
+resource "azurerm_dns_zone" "parallel" {
+  name                = "parallel.${var.parent_dns_zone_name}"
+  resource_group_name = azurerm_resource_group.main.name
+  tags                = var.default_tags
+}
+
+resource "azurerm_dns_ns_record" "parallel_delegation" {
+  name                = "parallel"
+  zone_name           = data.azurerm_dns_zone.parent.name
+  resource_group_name = data.azurerm_dns_zone.parent.resource_group_name
+  ttl                 = 300
+  records             = azurerm_dns_zone.parallel.name_servers
+}

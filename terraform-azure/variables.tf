@@ -92,3 +92,15 @@ variable "environment" {
   type        = string
   default     = "production"
 }
+
+variable "parent_dns_zone_name" {
+  description = "Name of the existing parent DNS zone"
+  type        = string
+  default     = "iykonect.iykons.com"
+}
+
+variable "parent_dns_zone_resource_group" {
+  description = "Resource group of the existing parent DNS zone"
+  type        = string
+  default     = "DevOps-ClickOps"
+}
