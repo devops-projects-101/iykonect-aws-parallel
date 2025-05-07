@@ -54,6 +54,13 @@ log "Private IP: $private_ip"
 log "AWS Region: $aws_region"
 log "Admin Username: $admin_username"
 
+
+# Set default AWS region if not provided
+if [ -z "$aws_region" ]; then
+    log "AWS region not provided, using default: eu-west-1"
+    aws_region="eu-west-1"
+fi
+
 # Export AWS credentials for ECR access
 export AWS_ACCESS_KEY_ID="$aws_access_key"
 export AWS_SECRET_ACCESS_KEY="$aws_secret_key"
