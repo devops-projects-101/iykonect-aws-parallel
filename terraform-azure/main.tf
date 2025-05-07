@@ -14,7 +14,7 @@ resource "azurerm_network_watcher" "main" {
 
 # Create Key Vault for SSH keys
 resource "azurerm_key_vault" "main" {
-  name                = "iykonectkv"
+  name                = "iykkv"
   location            = var.location
   resource_group_name = azurerm_resource_group.main.name
   tenant_id          = var.azure_tenant_id
@@ -60,7 +60,7 @@ module "vm" {
   resource_group_name  = azurerm_resource_group.main.name
   location             = var.location
   subnet_id            = module.virtual_network.vm_subnet_id
-  vm_size              = "Standard_D4s_v3"  # 4 vCPUs, 16 GB RAM
+  vm_size              = var.vm_size
   admin_username       = var.admin_username
   admin_password       = var.admin_password
   aws_access_key       = var.aws_access_key

@@ -87,10 +87,12 @@ resource "azurerm_linux_virtual_machine" "main" {
       admin_username = var.admin_username
       aws_access_key = var.aws_access_key
       aws_secret_key = var.aws_secret_key
-      aws_region = var.aws_region
-      # storage_account_name = var.storage_account_name
-      # storage_container_name = var.storage_container_name
-      # storage_blob_name = var.storage_blob_name
+      aws_region     = var.aws_region
+      vm_name        = "${var.prefix}-vm-${count.index}"
+      resource_group = var.resource_group_name
+      location       = var.location
+      public_ip      = azurerm_public_ip.vm[count.index].ip_address
+      private_ip     = azurerm_network_interface.main[count.index].private_ip_address
     })
   )
 }

@@ -28,6 +28,7 @@ resource "azurerm_network_security_group" "main" {
   resource_group_name = var.resource_group_name
   tags                = var.tags
 
+  # Basic management access
   security_rule {
     name                       = "SSH"
     priority                   = 1001
@@ -84,7 +85,7 @@ resource "azurerm_network_security_group" "main" {
     access                     = "Allow"
     protocol                   = "Tcp"
     source_port_range          = "*"
-    destination_port_range     = "5001"
+    destination_port_range     = "3000"
     source_address_prefix      = "*"
     destination_address_prefix = "*"
   }
@@ -211,7 +212,7 @@ resource "azurerm_network_security_group" "main" {
   }
 
   security_rule {
-    name                       = "DockerSwarmNetwork"
+    name                       = "DockerSwarmDiscovery"
     priority                   = 1016
     direction                  = "Inbound"
     access                     = "Allow"
@@ -223,7 +224,7 @@ resource "azurerm_network_security_group" "main" {
   }
 
   security_rule {
-    name                       = "DockerSwarmNetworkUDP"
+    name                       = "DockerSwarmDiscoveryUDP"
     priority                   = 1017
     direction                  = "Inbound"
     access                     = "Allow"
@@ -235,7 +236,7 @@ resource "azurerm_network_security_group" "main" {
   }
 
   security_rule {
-    name                       = "DockerOverlayNetwork"
+    name                       = "DockerOverlayNetworkUDP"
     priority                   = 1018
     direction                  = "Inbound"
     access                     = "Allow"
@@ -247,19 +248,19 @@ resource "azurerm_network_security_group" "main" {
   }
 
   security_rule {
-    name                       = "CommonContainerHTTP"
+    name                       = "NodeExporter"
     priority                   = 1019
     direction                  = "Inbound"
     access                     = "Allow"
     protocol                   = "Tcp"
     source_port_range          = "*"
-    destination_port_range     = "8080"
+    destination_port_range     = "9100"
     source_address_prefix      = "*"
     destination_address_prefix = "*"
   }
 
   security_rule {
-    name                       = "CommonContainerHTTPS"
+    name                       = "CAdvisor"
     priority                   = 1020
     direction                  = "Inbound"
     access                     = "Allow"
@@ -279,6 +280,32 @@ resource "azurerm_network_security_group" "main" {
     protocol                   = "Tcp"
     source_port_range          = "*"
     destination_port_range     = "65200-65535"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+  
+  # Allow additional ephemeral ports for container services
+  security_rule {
+    name                       = "ContainerEphemeralPorts"
+    priority                   = 1022
+    direction                  = "Inbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "32768-60999"
+    source_address_prefix      = "*"
+    destination_address_prefix = "*"
+  }
+  
+  # Allow outbound access to everything
+  security_rule {
+    name                       = "AllowAllOutbound"
+    priority                   = 1000
+    direction                  = "Outbound"
+    access                     = "Allow"
+    protocol                   = "*"
+    source_port_range          = "*"
+    destination_port_range     = "*"
     source_address_prefix      = "*"
     destination_address_prefix = "*"
   }
