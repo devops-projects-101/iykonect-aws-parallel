@@ -1,5 +1,10 @@
 # --- DNS Configuration for Subdomain Association ---
 
+
+# parallel.iykonect.iykons.com
+
+
+
 # Data source to reference the parent DNS zone
 # This zone should already exist and be managed elsewhere or manually
 data "azurerm_dns_zone" "parent" {
