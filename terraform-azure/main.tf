@@ -111,24 +111,28 @@ data "azurerm_dns_zone" "parent" {
   resource_group_name = var.parent_dns_zone_resource_group
 }
 
-# Create the delegated DNS zone for the subdomain (e.g., parallel.yourdomain.com)
+# Create the delegated DNS zone for the subdomain
 resource "azurerm_dns_zone" "parallel" {
   name                = "parallel.${var.parent_dns_zone_name}"
-  resource_group_name = azurerm_resource_group.main.name # Place the subdomain zone in the main RG
+  resource_group_name = azurerm_resource_group.main.name
   tags                = var.default_tags
 }
 
-# Create NS records in the parent zone to delegate the subdomain to the new zone
+# Create NS records in the parent zone to delegate the subdomain
 resource "azurerm_dns_ns_record" "parallel_delegation" {
-  name                = "parallel" # The subdomain name relative to the parent zone
+  name                = "parallel"
   zone_name           = data.azurerm_dns_zone.parent.name
   resource_group_name = data.azurerm_dns_zone.parent.resource_group_name
   ttl                 = 300
-  records             = azurerm_dns_zone.parallel.name_servers # Use the nameservers of the delegated zone
+  
+  # Explicitly list all name servers from the subdomain zone
+  records             = azurerm_dns_zone.parallel.name_servers
+  
+  # Ensure the DNS zone is created before the NS record
+  depends_on = [azurerm_dns_zone.parallel]
 }
 
 # Retrieve the Public IP associated with the Application Gateway
-# The name uses the correct naming convention from the module (${var.prefix}-appgw-pip)
 data "azurerm_public_ip" "appgw_public_ip" {
   name                = "${var.prefix}-appgw-pip"
   resource_group_name = azurerm_resource_group.main.name
@@ -137,23 +141,16 @@ data "azurerm_public_ip" "appgw_public_ip" {
   depends_on = [module.application_gateway]
 }
 
-# Create an A record in the delegated subdomain DNS zone
-# This A record points the root of the subdomain (parallel.yourdomain.com)
-# to the Public IP address of the Application Gateway.
+# Create an A record in the subdomain zone
 resource "azurerm_dns_a_record" "appgw_subdomain_a_record" {
-  # Use "@" for the root of the subdomain (parallel.<parent_dns_zone_name>)
   name                = "@"
   zone_name           = azurerm_dns_zone.parallel.name
-  resource_group_name = azurerm_dns_zone.parallel.resource_group_name
-  ttl                 = 300 # Time to live for the DNS record
-
-  # Set the record's IP address to the Application Gateway's Public IP
+  resource_group_name = azurerm_resource_group.main.name
+  ttl                 = 300
   records             = [data.azurerm_public_ip.appgw_public_ip.ip_address]
-
-  # Ensure the DNS record is created after the Application Gateway is deployed
-  # and the Public IP information is available.
+  
   depends_on = [
     module.application_gateway,
-    data.azurerm_public_ip.appgw_public_ip # Ensure the data source resolves the IP
+    data.azurerm_public_ip.appgw_public_ip
   ]
 }
