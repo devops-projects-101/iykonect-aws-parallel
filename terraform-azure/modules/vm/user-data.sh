@@ -14,6 +14,9 @@ log() {
 
 log "Starting initial setup on Azure VM..."
 
+
+
+
 # Create backup directories
 log "Creating backup directories..."
 mkdir -p /opt/iykonect/backups/scripts
@@ -40,34 +43,24 @@ apt-get install -y \
     software-properties-common \
     azure-cli
 
-# Set up variables for Azure Storage configuration
-STORAGE_ACCOUNT="${storage_account_name}"
-CONTAINER="${storage_container_name}"
-BLOB="${storage_blob_name}"
-
-log "Using storage account: $STORAGE_ACCOUNT, container: $CONTAINER, blob: $BLOB"
-
 # Create a timestamp for the current deployment
 DEPLOY_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
-# Fetch configuration from Azure Blob Storage using managed identity
-log "Fetching configuration from Azure Blob Storage..."
-# Get token for blob storage access
-TOKEN=$(curl -s 'http://169.254.169.254/metadata/identity/oauth2/token?api-version=2018-02-01&resource=https://storage.azure.com/' -H Metadata:true | jq -r '.access_token')
+# Set variables directly from Terraform
+log "Setting up configuration variables..."
+aws_access_key="${aws_access_key}"
+aws_secret_key="${aws_secret_key}"
+aws_region="${aws_region}"
+admin_username="${admin_username}"
 
-# Download the configuration file
-VM_CONFIG=$(curl -s -X GET -H "Authorization: Bearer $TOKEN" -H "x-ms-version: 2023-01-01" "https://$STORAGE_ACCOUNT.blob.core.windows.net/$CONTAINER/$BLOB")
 
-# Extract configuration values from the JSON
-log "Extracting configuration values..."
-aws_access_key=$(echo $VM_CONFIG | jq -r '.aws_access_key')
-aws_secret_key=$(echo $VM_CONFIG | jq -r '.aws_secret_key')
-aws_region=$(echo $VM_CONFIG | jq -r '.aws_region')
-admin_username=$(echo $VM_CONFIG | jq -r '.admin_username')
-app_name=$(echo $VM_CONFIG | jq -r '.app_name')
-environment=$(echo $VM_CONFIG | jq -r '.environment')
+aws_region="eu-west-1"
 
-log "Configuration retrieved successfully from Azure Storage Blob"
+
+log "Configuration values set successfully"
+log "AWS Region: $aws_region"
+log "Admin Username: $admin_username"
+
 
 # Export AWS credentials for ECR access
 export AWS_ACCESS_KEY_ID="$aws_access_key"
@@ -107,9 +100,10 @@ mkdir -p /opt/iykonect/backups/aws
 cp -r /root/.aws /opt/iykonect/backups/aws/credentials.$DEPLOY_TIMESTAMP
 chmod -R 600 /opt/iykonect/backups/aws
 
-# Set Azure-specific variables at runtime, not through template
+# Set Azure-specific variables at runtime
 # Using BASH_VAR format for variables that should be determined at runtime
 AZURE_VM="true"
+
 # Using single quotes to prevent Terraform from processing these as template variables
 log 'Getting Azure VM metadata at runtime...'
 log 'Hostname, IP addresses, and other Azure metadata will be determined when the script runs on the VM'
@@ -122,6 +116,8 @@ mkdir -p /opt/iykonect/env
 mkdir -p /opt/iykonect/prometheus
 mkdir -p /opt/iykonect/grafana
 mkdir -p /opt/iykonect/logs
+mkdir -p /opt/iykonect/backups/env
+mkdir -p /opt/iykonect/backups/scripts
 
 # After setting environment variables, create a snapshot
 log "Creating environment variables snapshot..."
@@ -136,8 +132,6 @@ Location: $LOCATION
 Public IP: $PUBLIC_IP
 Private IP: $PRIVATE_IP
 AWS Region: $AWS_DEFAULT_REGION
-Storage Account: $STORAGE_ACCOUNT
-Container: $CONTAINER
 EOF
 
 chmod 600 /opt/iykonect/backups/deployment_manifest_$DEPLOY_TIMESTAMP.txt
