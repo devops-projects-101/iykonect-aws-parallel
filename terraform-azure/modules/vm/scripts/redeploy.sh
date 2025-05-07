@@ -61,6 +61,13 @@ log "Creating/recreating docker network..."
 docker network rm app-network 2>/dev/null || true
 docker network create app-network || true
 
+# Refresh secrets from Azure Key Vault
+log "Refreshing secrets from Azure Key Vault..."
+/opt/iykonect-repo/terraform-azure/modules/vm/scripts/secrets-setup.sh
+if [ $? -ne 0 ]; then
+    log "WARNING: There was an issue refreshing secrets. Continuing with deployment..."
+fi
+
 # Make sure AWS credentials are available for ECR access
 if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ] || [ -z "$AWS_DEFAULT_REGION" ]; then
     log "AWS credentials not found in environment. Checking ~/.aws/credentials..."
@@ -206,7 +213,7 @@ log "All containers deployed successfully"
 
 # Run health check to verify deployment
 log "Running health check..."
-/opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/container-health-check.sh 2>&1 | tee -a /var/log/redeploy.log
+/opt/iykonect-repo/terraform-azure/modules/vm/scripts/container-health-check.sh 2>&1 | tee -a /var/log/redeploy.log
 
 # Clean up unused images to save disk space
 log "Cleaning up unused Docker images..."

@@ -54,11 +54,44 @@ log "Private IP: $private_ip"
 log "AWS Region: $aws_region"
 log "Admin Username: $admin_username"
 
-
 # Set default AWS region if not provided
 if [ -z "$aws_region" ]; then
     log "AWS region not provided, using default: eu-west-1"
     aws_region="eu-west-1"
+fi
+
+# Set repo location
+AZURE_REPO_LOCATION="/opt/iykonect-repo"
+log "Azure repo location: $AZURE_REPO_LOCATION"
+
+# Use Azure Instance Metadata Service if any values are missing
+if [ -z "$vm_name" ] || [ -z "$resource_group" ] || [ -z "$location" ] || [ -z "$public_ip" ] || [ -z "$private_ip" ]; then
+    log "Some metadata values missing, using Azure Instance Metadata Service to fill gaps..."
+    
+    if [ -z "$vm_name" ]; then
+        vm_name=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/compute/name?api-version=2021-02-01&format=text")
+        log "Retrieved VM name: $vm_name"
+    fi
+    
+    if [ -z "$resource_group" ]; then
+        resource_group=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/compute/resourceGroupName?api-version=2021-02-01&format=text")
+        log "Retrieved resource group: $resource_group"
+    fi
+    
+    if [ -z "$location" ]; then
+        location=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/compute/location?api-version=2021-02-01&format=text")
+        log "Retrieved location: $location"
+    fi
+    
+    if [ -z "$public_ip" ]; then
+        public_ip=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/publicIpAddress?api-version=2021-02-01&format=text")
+        log "Retrieved public IP: $public_ip"
+    fi
+    
+    if [ -z "$private_ip" ]; then
+        private_ip=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/privateIpAddress?api-version=2021-02-01&format=text")
+        log "Retrieved private IP: $private_ip"
+    fi
 fi
 
 # Export AWS credentials for ECR access
@@ -72,6 +105,7 @@ export RESOURCE_GROUP="$resource_group"
 export LOCATION="$location"
 export PUBLIC_IP="$public_ip"
 export PRIVATE_IP="$private_ip"
+export AZURE_REPO_LOCATION="$AZURE_REPO_LOCATION"
 
 # Create permanent VM metadata manifest file that can be sourced by other scripts
 log "Creating permanent VM metadata manifest file..."
@@ -82,6 +116,9 @@ cat > $MANIFEST_DIR/vm_metadata.sh << EOF
 #!/bin/bash
 # This file contains VM metadata and is automatically generated
 # Last updated: $(date)
+
+# Repository Location
+export AZURE_REPO_LOCATION="$AZURE_REPO_LOCATION"
 
 # Azure VM Metadata
 export VM_NAME="$vm_name"
@@ -135,14 +172,17 @@ AZURE_VM="true"
 
 # Create directories for the repository and necessary config directories
 log "Creating directories for repository and configurations..."
-mkdir -p /opt/iykonect-aws-repo
+mkdir -p $AZURE_REPO_LOCATION
 mkdir -p /opt/iykonect/config
 mkdir -p /opt/iykonect/env
 mkdir -p /opt/iykonect/prometheus
 mkdir -p /opt/iykonect/grafana
+mkdir -p /opt/iykonect/nginx
+mkdir -p /opt/iykonect/nginx/conf.d
 mkdir -p /opt/iykonect/logs
 mkdir -p /opt/iykonect/backups/env
 mkdir -p /opt/iykonect/backups/scripts
+mkdir -p /opt/iykonect-azure
 
 # After setting environment variables, create a snapshot
 log "Creating environment variables snapshot..."
@@ -158,6 +198,7 @@ Location: $LOCATION
 Public IP: $PUBLIC_IP
 Private IP: $PRIVATE_IP
 AWS Region: $AWS_DEFAULT_REGION
+Repository Location: $AZURE_REPO_LOCATION
 EOF
 
 log "Deployment manifest created at /opt/iykonect/backups/deployment_manifest_$DEPLOY_TIMESTAMP.txt"
@@ -165,37 +206,50 @@ log "Deployment manifest created at /opt/iykonect/backups/deployment_manifest_$D
 # Create a backup directory for deployment scripts
 mkdir -p /opt/iykonect/backups/scripts
 
-# Clone the repository for configuration files or copy from mounted disk
-log "Setting up repository for configuration files..."
-git config --global credential.helper store
-cd /opt/iykonect-aws-repo
-git clone https://github.com/organization/iykonect-aws-repo.git . || echo "Warning: Unable to clone the repository, using local files instead"
+# Download latest release from S3 bucket instead of git clone
+log "Downloading latest release from S3 bucket..."
+cd /tmp
+aws s3 cp s3://iykonect-aws-parallel/code-deploy/repo-content.zip /tmp/repo-content.zip
 
-# Make scripts executable and create Azure-specific directory
-mkdir -p /opt/iykonect-azure
-ln -sf /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/docker-setup.sh /opt/iykonect-azure/
-ln -sf /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/redeploy.sh /opt/iykonect-azure/
-ln -sf /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/secrets-setup.sh /opt/iykonect-azure/
-ln -sf /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/status-setup.sh /opt/iykonect-azure/
+if [ $? -ne 0 ]; then
+    log "ERROR: Failed to download repository content from S3."
+    exit 1
+fi
 
-# Execute Azure-specific status command setup
-log "Running Azure status command setup..."
-/opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/status-setup.sh
-log "Azure status command setup completed"
+# Extract only VM scripts to repo location instead of everything
+log "Extracting VM scripts from repository content..."
+mkdir -p /tmp/repo-extract
+unzip -q /tmp/repo-content.zip -d /tmp/repo-extract/
 
-# Execute Azure-specific Secret Manager setup
-log "Running Azure-specific secrets setup..."
-/opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/secrets-setup.sh
-log "Azure secrets setup completed"
+# Create repo directory and copy only needed VM scripts
+log "Copying VM scripts to $AZURE_REPO_LOCATION..."
+mkdir -p $AZURE_REPO_LOCATION/terraform-azure/modules/vm/scripts
 
-# Execute Docker setup
-log "Running Docker setup and configuration..."
-/opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/docker-setup.sh
-log "Docker setup and configuration completed"
+# Copy only the VM scripts
+cp -r /tmp/repo-extract/terraform-azure/modules/vm/scripts/* $AZURE_REPO_LOCATION/terraform-azure/modules/vm/scripts/
 
-# Execute Docker container deployment
-log "Running container deployment..."
-/opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/redeploy.sh
-log "Container deployment completed"
+# Remove temporary extraction directory
+rm -rf /tmp/repo-extract
+rm -f /tmp/repo-content.zip
+log "Repository content extracted and organized successfully"
 
-log "Azure VM setup completed successfully!"
+# Make all scripts executable
+log "Setting execute permissions on scripts..."
+find $AZURE_REPO_LOCATION -name "*.sh" -exec chmod +x {} \;
+
+# Create symbolic links for frequently used scripts
+ln -sf $AZURE_REPO_LOCATION/terraform-azure/modules/vm/scripts/docker-setup.sh /opt/iykonect-azure/
+ln -sf $AZURE_REPO_LOCATION/terraform-azure/modules/vm/scripts/redeploy.sh /opt/iykonect-azure/
+ln -sf $AZURE_REPO_LOCATION/terraform-azure/modules/vm/scripts/secrets-setup.sh /opt/iykonect-azure/
+ln -sf $AZURE_REPO_LOCATION/terraform-azure/modules/vm/scripts/status-setup.sh /opt/iykonect-azure/
+ln -sf $AZURE_REPO_LOCATION/terraform-azure/modules/vm/scripts/container-health-check.sh /opt/iykonect-azure/
+
+# Copy nginx configuration to the nginx directory
+cp $AZURE_REPO_LOCATION/terraform-azure/modules/vm/scripts/nginx.conf /opt/iykonect/nginx/
+cp $AZURE_REPO_LOCATION/terraform-azure/modules/vm/scripts/default.conf /opt/iykonect/nginx/conf.d/
+
+# Continue with setup by running docker-setup.sh
+log "Running docker-setup.sh..."
+/opt/iykonect-azure/docker-setup.sh
+
+log "Initial setup completed successfully"

@@ -153,7 +153,7 @@ echo
 echo -e "${CYAN}🩺 CONTAINER HEALTH CHECK${NC}"
 echo -e "──────────────────────────────────"
 # Call the container health check script but suppress the header to avoid duplication
-/opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/container-health-check.sh | grep -v "====" | grep -v "AZURE VM CONTAINER HEALTH CHECK" | grep -v "VM:" | grep -v "Location:" | grep -v "Private IP:" | grep -v "-----" | grep -v "APPLICATION ACCESS URLS"
+/opt/iykonect-repo/terraform-azure/modules/vm/scripts/container-health-check.sh | grep -v "====" | grep -v "AZURE VM CONTAINER HEALTH CHECK" | grep -v "VM:" | grep -v "Location:" | grep -v "Private IP:" | grep -v "-----" | grep -v "APPLICATION ACCESS URLS"
 echo
 
 echo -e "${CYAN}🔄 AZURE CONNECTIVITY STATUS${NC}"
@@ -228,7 +228,7 @@ clear
 echo "===================================================="
 echo "         AZURE VM CONTAINER HEALTH CHECKER          "
 echo "===================================================="
-/opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/container-health-check.sh
+/opt/iykonect-repo/terraform-azure/modules/vm/scripts/container-health-check.sh
 EOF
 
 chmod +x /usr/local/bin/az-health
@@ -249,12 +249,12 @@ echo "Starting redeployment process on Azure VM..."
 echo
 
 # Execute the Azure redeploy script
-/opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/redeploy.sh
+/opt/iykonect-repo/terraform-azure/modules/vm/scripts/redeploy.sh
 
 # Show health check after redeployment
 echo
 echo "Final health status:"
-/opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/container-health-check.sh
+/opt/iykonect-repo/terraform-azure/modules/vm/scripts/container-health-check.sh
 EOF
 
 chmod +x /usr/local/bin/az-redeploy

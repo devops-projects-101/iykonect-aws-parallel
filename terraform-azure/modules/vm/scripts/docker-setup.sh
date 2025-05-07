@@ -12,19 +12,8 @@ log() {
 # Source VM metadata from the permanent manifest file
 METADATA_FILE="/opt/iykonect/metadata/vm_metadata.sh"
 
-if [ -f "$METADATA_FILE" ]; then
-    log "Loading VM metadata from $METADATA_FILE"
-    source "$METADATA_FILE"
-    log "Metadata loaded successfully"
-else
-    log "Metadata file not found, falling back to Azure Instance Metadata Service"
-    # Fallback to Azure Instance Metadata Service
-    VM_NAME=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/compute/name?api-version=2021-02-01&format=text")
-    RESOURCE_GROUP=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/compute/resourceGroupName?api-version=2021-02-01&format=text")
-    LOCATION=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/compute/location?api-version=2021-02-01&format=text")
-    PUBLIC_IP=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/publicIpAddress?api-version=2021-02-01&format=text")
-    PRIVATE_IP=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/privateIpAddress?api-version=2021-02-01&format=text")
-fi
+log "Loading VM metadata from $METADATA_FILE"
+source "$METADATA_FILE"
 
 log "==============================================="
 log "Starting Azure-specific Docker installation and setup"
@@ -35,6 +24,7 @@ log "Resource Group: $RESOURCE_GROUP"
 log "Location: $LOCATION"
 log "Public IP: $PUBLIC_IP"
 log "Private IP: $PRIVATE_IP"
+log "Repository Location: $AZURE_REPO_LOCATION"
 
 # Install Docker
 log "Installing Docker..."
@@ -66,15 +56,10 @@ mkdir -p /opt/iykonect/grafana
 mkdir -p /opt/iykonect/logs
 mkdir -p /opt/iykonect/nginx/conf.d
 
-# Copy Nginx configuration files from scripts directory
+# Copy Nginx configuration files from repository
 log "Copying Nginx configuration files..."
-cp /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/nginx.conf /opt/iykonect/nginx/
-cp /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/default.conf /opt/iykonect/nginx/conf.d/
-
-# Ensure the scripts are executable
-log "Setting execute permissions on scripts..."
-chmod +x /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/container-health-check.sh
-chmod +x /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/redeploy.sh
+cp $AZURE_REPO_LOCATION/terraform-azure/modules/vm/scripts/nginx.conf /opt/iykonect/nginx/
+cp $AZURE_REPO_LOCATION/terraform-azure/modules/vm/scripts/default.conf /opt/iykonect/nginx/conf.d/
 
 # Now that Docker is installed, call redeploy.sh to handle container deployment
 log "==============================================="
@@ -82,13 +67,10 @@ log "Calling redeploy.sh to handle container deployment"
 log "==============================================="
 
 # Set environment variables for redeploy.sh
-export AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION:-eu-west-1}
 export AZURE_VM=true
-export AZURE_LOCATION=$LOCATION
-export AZURE_RESOURCE_GROUP=$RESOURCE_GROUP
 
 # Call redeploy.sh to handle deployment
-/opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/redeploy.sh
+$AZURE_REPO_LOCATION/terraform-azure/modules/vm/scripts/redeploy.sh
 
 # Final message
 log "==============================================="

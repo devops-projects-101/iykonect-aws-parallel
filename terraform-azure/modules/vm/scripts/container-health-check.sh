@@ -3,6 +3,12 @@
 # Azure-specific container health check script
 # This script checks the health status of all deployed containers in Azure VM
 
+log() {
+    echo "[$(date)] $1"
+}
+
+CONFIG_PATH="/opt/iykonect-repo/terraform-azure/modules/vm/scripts/container-health-check.conf"
+
 # Enable color output
 GREEN="\033[0;32m"
 RED="\033[0;31m"
@@ -182,6 +188,16 @@ echo "AZURE CONNECTIVITY CHECK"
 echo "------------------------"
 check_azure_connectivity
 
+# Check all running containers
+log "Checking health of all running containers..."
+docker ps -a --format "{{.Names}}\t{{.Status}}" | while read container status; do
+    if [[ $status == *"Up"* ]]; then
+        log "✅ $container is running"
+    else
+        log "❌ $container is not running properly: $status"
+    fi
+done
+
 # Show URL access methods
 echo ""
 echo "===================================================="
@@ -212,7 +228,7 @@ else
     
     echo ""
     echo "For troubleshooting, try running: docker-compose logs"
-    echo "Or restart services with: /opt/iykonect-aws-repo/terraform-azure/modules/vm/scripts/redeploy.sh"
+    echo "Or restart services with: /opt/iykonect-repo/terraform-azure/modules/vm/scripts/redeploy.sh"
 fi
 
 exit $OVERALL_STATUS
