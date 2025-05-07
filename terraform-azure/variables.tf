@@ -64,9 +64,9 @@ variable "default_tags" {
 }
 
 variable "vm_size" {
-  description = "Size of the Azure VM"
+  description = "Size of the Azure VM (e.g., Standard_D8s_v4 for 8 cores, 32 GB RAM)"
   type        = string
-  default     = "Standard_B2s"
+  default     = "Standard_D8s_v4" # Or "Standard_D8s_v5"
 }
 
 variable "admin_username" {
