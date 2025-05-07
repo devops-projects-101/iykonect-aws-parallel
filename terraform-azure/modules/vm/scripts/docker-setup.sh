@@ -5,9 +5,13 @@
 set -e
 
 # Logging function
+
 log() {
     echo "[$(date)] $1" | sudo tee -a /var/log/user-data.log
 }
+
+
+log "Starting from docker setup"
 
 # Source VM metadata from the permanent manifest file
 METADATA_FILE="/opt/iykonect/metadata/vm_metadata.sh"
@@ -18,13 +22,6 @@ source "$METADATA_FILE"
 log "==============================================="
 log "Starting Azure-specific Docker installation and setup"
 log "==============================================="
-log "VM Information:"
-log "Name: $VM_NAME"
-log "Resource Group: $RESOURCE_GROUP"
-log "Location: $LOCATION"
-log "Public IP: $PUBLIC_IP"
-log "Private IP: $PRIVATE_IP"
-log "Repository Location: $AZURE_REPO_LOCATION"
 
 # Install Docker
 log "Installing Docker..."
@@ -47,14 +44,6 @@ systemctl start docker
 log "Setting up Docker environment..."
 docker system prune -af
 
-# Create necessary directories for application
-log "Creating application directories..."
-mkdir -p /opt/iykonect/config
-mkdir -p /opt/iykonect/env
-mkdir -p /opt/iykonect/prometheus
-mkdir -p /opt/iykonect/grafana
-mkdir -p /opt/iykonect/logs
-mkdir -p /opt/iykonect/nginx/conf.d
 
 # Copy Nginx configuration files from repository
 log "Copying Nginx configuration files..."

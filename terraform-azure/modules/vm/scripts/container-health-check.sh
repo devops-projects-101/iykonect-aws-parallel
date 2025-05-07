@@ -4,8 +4,10 @@
 # This script checks the health status of all deployed containers in Azure VM
 
 log() {
-    echo "[$(date)] $1"
+    echo "[$(date)] $1" | tee -a /var/log/user-data.log
 }
+
+log "Starting from container health check script"
 
 CONFIG_PATH="/opt/iykonect-repo/terraform-azure/modules/vm/scripts/container-health-check.conf"
 
@@ -20,12 +22,10 @@ OVERALL_STATUS=0
 FAILED_CONTAINERS=""
 
 # Get Azure instance metadata
-VM_NAME=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/compute/name?api-version=2021-02-01&format=text")
-RESOURCE_GROUP=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/compute/resourceGroupName?api-version=2021-02-01&format=text")
-LOCATION=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/compute/location?api-version=2021-02-01&format=text")
-PUBLIC_IP=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/publicIpAddress?api-version=2021-02-01&format=text")
-PRIVATE_IP=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/privateIpAddress?api-version=2021-02-01&format=text")
+METADATA_FILE="/opt/iykonect/metadata/vm_metadata.sh"
 
+log "Loading VM metadata from $METADATA_FILE"
+source "$METADATA_FILE"
 check_endpoint() {
     local endpoint="$1"
     local container="$2"

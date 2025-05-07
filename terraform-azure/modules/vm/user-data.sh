@@ -45,6 +45,15 @@ location="${location}"
 public_ip="${public_ip}"
 private_ip="${private_ip}"
 
+
+# Set default AWS region if not provided
+if [ -z "$aws_region" ]; then
+    log "AWS region not provided, using default: eu-west-1"
+    aws_region="eu-west-1"
+fi
+
+
+
 log "Configuration values set successfully"
 log "VM Name: $vm_name"
 log "Resource Group: $resource_group"
@@ -54,11 +63,6 @@ log "Private IP: $private_ip"
 log "AWS Region: $aws_region"
 log "Admin Username: $admin_username"
 
-# Set default AWS region if not provided
-if [ -z "$aws_region" ]; then
-    log "AWS region not provided, using default: eu-west-1"
-    aws_region="eu-west-1"
-fi
 
 # Set repo location
 AZURE_REPO_LOCATION="/opt/iykonect-repo"
@@ -248,8 +252,23 @@ ln -sf $AZURE_REPO_LOCATION/terraform-azure/modules/vm/scripts/container-health-
 cp $AZURE_REPO_LOCATION/terraform-azure/modules/vm/scripts/nginx.conf /opt/iykonect/nginx/
 cp $AZURE_REPO_LOCATION/terraform-azure/modules/vm/scripts/default.conf /opt/iykonect/nginx/conf.d/
 
-# Continue with setup by running docker-setup.sh
-log "Running docker-setup.sh..."
-/opt/iykonect-azure/docker-setup.sh
 
 log "Initial setup completed successfully"
+
+# Execute status command setup
+log "Running status command setup..."
+/opt/iykonect-azure/status-setup.sh
+log "Status command setup completed"
+
+# Execute Secret Manager setup
+log "Running Secrets Manager setup..."
+/opt/iykonect-azure/secrets-setup.sh
+log "Secrets Manager setup completed"
+
+# Execute Docker setup
+log "Running Docker setup and deployment..."
+/opt/iykonect-azure/docker-setup.sh
+log "Docker setup and deployment completed"
+
+# Final status
+log "=== Main User Data Script Complete ==="

@@ -7,25 +7,14 @@ log() {
     echo "[$(date)] $1" | sudo tee -a /var/log/user-data.log
 }
 
+log "Starting from status setup"
 log "Setting up system status command for Azure VM..."
 
 # Source VM metadata from the permanent manifest file
 METADATA_FILE="/opt/iykonect/metadata/vm_metadata.sh"
 
-if [ -f "$METADATA_FILE" ]; then
-    log "Loading VM metadata from $METADATA_FILE"
-    source "$METADATA_FILE"
-    log "Metadata loaded successfully"
-else
-    log "Metadata file not found, falling back to Azure Instance Metadata Service"
-    # Fallback to Azure Instance Metadata Service
-    VM_NAME=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/compute/name?api-version=2021-02-01&format=text")
-    RESOURCE_GROUP=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/compute/resourceGroupName?api-version=2021-02-01&format=text")
-    LOCATION=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/compute/location?api-version=2021-02-01&format=text")
-    SUBSCRIPTION_ID=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/compute/subscriptionId?api-version=2021-02-01&format=text")
-    PUBLIC_IP=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/publicIpAddress?api-version=2021-02-01&format=text")
-    PRIVATE_IP=$(curl -s -H Metadata:true --noproxy "*" "http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/privateIpAddress?api-version=2021-02-01&format=text")
-fi
+log "Loading VM metadata from $METADATA_FILE"
+source "$METADATA_FILE"
 
 # Setup welcome message for Azure - update to use metadata file
 cat << 'EOF' > /etc/profile.d/azure-welcome.sh
