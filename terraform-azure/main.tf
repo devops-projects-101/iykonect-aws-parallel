@@ -86,9 +86,10 @@ module "vm" {
   # The module should output the private IPs of the deployed VMs, e.g., vm_private_ips
 }
 
-# Then create the Application Gateway
+# Then create the Application Gateway (only if enabled)
 # It uses the VM private IP addresses as backend targets
 module "application_gateway" {
+  count               = var.enable_application_gateway ? 1 : 0
   source              = "./modules/application_gateway" # Path to your application_gateway module
   prefix              = var.prefix
   resource_group_name = azurerm_resource_group.main.name
@@ -98,7 +99,5 @@ module "application_gateway" {
   tags                = var.default_tags
   # Ensure the Application Gateway is created after the VMs
   depends_on          = [module.vm]
-  # Your application_gateway module should output the Public IP resource ID or name
-  # For example, it might output 'public_ip_id' or 'public_ip_name'
 }
 

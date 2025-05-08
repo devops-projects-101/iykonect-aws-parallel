@@ -104,3 +104,9 @@ variable "parent_dns_zone_resource_group" {
   type        = string
   default     = "DevOps-ClickOps"
 }
+
+variable "enable_application_gateway" {
+  description = "Whether to deploy the Application Gateway. If false, DNS will point directly to VM"
+  type        = bool
+  default     = true
+}

@@ -33,8 +33,9 @@ resource "azurerm_dns_ns_record" "parallel_delegation" {
   depends_on = [azurerm_dns_zone.parallel]
 }
 
-# Retrieve the Public IP associated with the Application Gateway
+# Retrieve the Public IP associated with the Application Gateway (only if enabled)
 data "azurerm_public_ip" "appgw_public_ip" {
+  count               = var.enable_application_gateway ? 1 : 0
   name                = "${var.prefix}-appgw-pip"
   resource_group_name = azurerm_resource_group.main.name
   
@@ -42,16 +43,18 @@ data "azurerm_public_ip" "appgw_public_ip" {
   depends_on = [module.application_gateway]
 }
 
-# Create an A record in the subdomain zone
-resource "azurerm_dns_a_record" "appgw_subdomain_a_record" {
+# Create an A record in the subdomain zone pointing to either Application Gateway or VM based on toggle
+resource "azurerm_dns_a_record" "subdomain_a_record" {
   name                = "@"
   zone_name           = azurerm_dns_zone.parallel.name
   resource_group_name = azurerm_resource_group.main.name
   ttl                 = 300
-  records             = [data.azurerm_public_ip.appgw_public_ip.ip_address]
+  
+  # If Application Gateway is enabled, use its IP; otherwise use the VM's public IP
+  records             = var.enable_application_gateway ? [data.azurerm_public_ip.appgw_public_ip[0].ip_address] : [module.vm.vm_public_ips[0]]
   
   depends_on = [
-    module.application_gateway,
-    data.azurerm_public_ip.appgw_public_ip
+    module.vm,
+    module.application_gateway
   ]
 }
