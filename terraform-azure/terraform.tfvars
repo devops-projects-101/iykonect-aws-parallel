@@ -1,7 +1,7 @@
 # Azure Configuration
 prefix          = "iykonect-infrastucture"
 location        = "West Europe"
-vm_size         = "Standard_D8s_v4"
+vm_size         = "Standard_D4_v4"
 admin_username  = "azure"
 # admin_password is provided via GitHub Actions secrets
 desired_count   = 1
