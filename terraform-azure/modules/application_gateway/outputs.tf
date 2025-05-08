@@ -17,3 +17,8 @@ output "appgw_id" {
   description = "ID of the Application Gateway"
   value       = azurerm_application_gateway.main.id
 }
+
+output "appgw_fqdn" {
+  description = "FQDN (Fully Qualified Domain Name) of the Application Gateway"
+  value       = azurerm_public_ip.appgw.fqdn
+}

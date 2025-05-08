@@ -13,6 +13,11 @@ output "application_gateway_ip" {
   value       = module.application_gateway.public_ip
 }
 
+output "application_gateway_domain" {
+  description = "Domain name (FQDN) of the Azure Application Gateway"
+  value       = module.application_gateway.appgw_fqdn
+}
+
 output "application_gateway_url" {
   description = "URL for the Application Gateway"
   value       = "http://${module.application_gateway.public_ip}"
